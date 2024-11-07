@@ -152,7 +152,6 @@ impl Traverser for HtmlExport {
                 if let Some(parent) = c.syntax().parent() {
                     if parent.kind() == SyntaxKind::FN_REF || parent.kind() == SyntaxKind::FN_DEF {
                         let label = token(&parent, SyntaxKind::FN_LABEL).unwrap();
-                        dbg!(&label);
                         let _ = write!(&mut self.output, "id=\"footnote_{}\" ", label);
                     }
                 }
