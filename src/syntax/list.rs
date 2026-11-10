@@ -1,4 +1,4 @@
-use memchr::{memchr, memchr2};
+use memchr::memchr;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take},
@@ -199,9 +199,21 @@ fn list_item_checkbox(input: Input) -> IResult<Input, (GreenElement, Input), ()>
 fn list_item_tag(input: Input) -> IResult<Input, (GreenElement, Input), ()> {
     let bytes = input.as_bytes();
 
-    let (input, tag) = match memchr2(b'\n', b':', bytes) {
-        Some(idx) if idx > 0 && bytes[idx] == b':' => input.take_split(idx),
-        _ => return Err(nom::Err::Error(())),
+    // The tag separator is ` :: `: a `::` preceded by a space or tab and
+    // followed by a space, tab, line ending or end of input. Search only the
+    // first line of the item; a `::` that fails this test (e.g. inside a
+    // link path) is skipped.
+    let line_end = memchr(b'\n', bytes).unwrap_or(bytes.len());
+    let idx = (1..line_end.saturating_sub(1)).find(|&i| {
+        bytes[i] == b':'
+            && bytes[i + 1] == b':'
+            && matches!(bytes[i - 1], b' ' | b'\t')
+            && matches!(bytes.get(i + 2).copied(), None | Some(b' ' | b'\t' | b'\r' | b'\n'))
+    });
+
+    let (input, tag) = match idx {
+        Some(idx) => input.take_split(idx),
+        None => return Err(nom::Err::Error(())),
     };
     let (input, ws) = space0(input)?;
     let (input, colon2) = colon2_token(input)?;
@@ -614,4 +626,37 @@ fn parse() {
     assert!(list_node(("-a", config).into()).is_err());
     assert!(list_node(("*\r\n", config).into()).is_err());
     assert!(list_node(("* ", config).into()).is_err());
+}
+
+#[test]
+fn list_item_tag_separator() {
+    use super::SyntaxKind;
+    use crate::Org;
+    use rowan::ast::AstNode;
+
+    // Counts nodes of `kind` in the parsed document, and checks the input
+    // round-trips losslessly.
+    let count = |s: &str, kind: SyntaxKind| {
+        let org = Org::parse(s);
+        assert_eq!(org.to_org(), s);
+        org.document()
+            .syntax()
+            .descendants()
+            .filter(|n| n.kind() == kind)
+            .count()
+    };
+
+    // `::` inside a link path is not a tag separator
+    assert_eq!(count("- [[test.org::Heading]]\n- [[test.org::#1]]\n", LIST_ITEM_TAG), 0);
+    assert_eq!(count("- [[test.org::Heading]]\n- [[test.org::#1]]\n", LINK), 2);
+
+    // ` :: ` is a tag separator
+    assert_eq!(count("- Term :: definition\n", LIST_ITEM_TAG), 1);
+
+    // a failing `::` is skipped, a later passing one is used
+    assert_eq!(count("- see [[a::b]] :: definition\n", LIST_ITEM_TAG), 1);
+    assert_eq!(count("- see [[a::b]] :: definition\n", LINK), 1);
+
+    // no surrounding whitespace, no tag
+    assert_eq!(count("- a::b\n", LIST_ITEM_TAG), 0);
 }
