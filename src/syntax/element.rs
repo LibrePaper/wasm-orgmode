@@ -290,7 +290,9 @@ fn affiliated_keywords() {
         FN_LABEL@30..34 "WORD"
         R_BRACKET@34..35 "]"
         FN_CONTENT@35..55
-          TEXT@35..55 " https://orgmode.org"
+          TEXT@35..36 " "
+          LINK@36..55
+            LINK_PATH@36..55 "https://orgmode.org"
     "###
     );
 

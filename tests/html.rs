@@ -241,3 +241,13 @@ fn table_empty_cell_keeps_columns() {
         "{html}"
     );
 }
+
+#[test]
+fn plain_links_render_as_anchors() {
+    let html = Org::parse("See https://orgmode.org/manual, or <https://x.org/a>.\n").to_html();
+    assert!(html.contains(r#"<a href="https://orgmode.org/manual">https://orgmode.org/manual</a>,"#), "{html}");
+    assert!(html.contains(r#"<a href="https://x.org/a">https://x.org/a</a>."#), "{html}");
+
+    let html = Org::parse("=https://a.org= [[https://b.org][b]]\n").to_html();
+    assert_eq!(html.matches("<a ").count(), 1, "{html}");
+}

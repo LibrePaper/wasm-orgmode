@@ -90,7 +90,9 @@ fn parse() {
           STAR@7..8 "*"
           TEXT@8..12 "bold"
           STAR@12..13 "*"
-        TEXT@13..36 " -  https://orgmode.org"
+        TEXT@13..17 " -  "
+        LINK@17..36
+          LINK_PATH@17..36 "https://orgmode.org"
     "#
     );
 
@@ -104,7 +106,9 @@ fn parse() {
       FN_LABEL@4..10 "word_1"
       R_BRACKET@10..11 "]"
       FN_CONTENT@11..31
-        TEXT@11..31 " https://orgmode.org"
+        TEXT@11..12 " "
+        LINK@12..31
+          LINK_PATH@12..31 "https://orgmode.org"
     "#
     );
 
@@ -118,7 +122,9 @@ fn parse() {
       FN_LABEL@4..10 "WORD-1"
       R_BRACKET@10..11 "]"
       FN_CONTENT@11..31
-        TEXT@11..31 " https://orgmode.org"
+        TEXT@11..12 " "
+        LINK@12..31
+          LINK_PATH@12..31 "https://orgmode.org"
     "#
     );
 
@@ -172,7 +178,9 @@ fn parse() {
       FN_LABEL@18..24 "WORD-1"
       R_BRACKET@24..25 "]"
       FN_CONTENT@25..45
-        TEXT@25..45 " https://orgmode.org"
+        TEXT@25..26 " "
+        LINK@26..45
+          LINK_PATH@26..45 "https://orgmode.org"
     "##
     );
 }
