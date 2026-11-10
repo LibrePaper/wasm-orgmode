@@ -1,0 +1,21 @@
+#+TITLE: Hi *there*
+#+begin_src python :tangle no
+x = 1
+#+end_src
+
+* TODO [#A] Head /it/ $x$ :a:b:
+SCHEDULED: <2024-01-31 Wed>
+:PROPERTIES:
+:ID: abc
+:END:
+Para with [[http://x.org][desc]] and [cite:@key1;@key2] and [fn:1] \alpha.
+
+- item one
+  - [ ] nested :: desc
+1. num
+
+| a | b |
+|---+---|
+| c | d |
+** Sub
+text =verb= ~code~

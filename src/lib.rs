@@ -18,6 +18,7 @@ pub use wasm_helpers::{diagnostic, page};
 pub mod ast;
 pub mod config;
 mod entities;
+pub mod lezer;
 pub mod export;
 mod org;
 pub mod render;
