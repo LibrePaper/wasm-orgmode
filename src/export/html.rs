@@ -265,6 +265,13 @@ impl Traverser for HtmlExport {
 
             Event::Enter(Container::OrgTable(table)) => {
                 self.output += "<table>";
+                if let Some(caption) = table.caption().and_then(|k| k.value()) {
+                    let _ = write!(
+                        &mut self.output,
+                        "<caption>{}</caption>",
+                        HtmlEscape(caption.as_ref().trim())
+                    );
+                }
                 self.table_row = if table.has_header() {
                     TableRow::HeaderRule
                 } else {

@@ -189,3 +189,24 @@ fn footnote() {
         @r##""<main><section><p><code>org-inlinetask-min-level</code><a href=\"#footnote_oiml\" class=\"footnote-reference\">[oiml]</a><span class=\"footnote-content\" id=\"footnote_oiml\" >The default value of \n<code>org-inlinetask-min-level</code> is <code>15</code>.</span></p></section></main>""##
     );
 }
+
+#[test]
+fn table_caption() {
+    let html = Org::parse("#+NAME: t\n#+CAPTION: cap\n| a | b |\n|---+---|\n| 1 | 2 |\n").to_html();
+    assert!(html.contains("<table>"), "{html}");
+    assert!(html.contains("<caption>cap</caption>"), "{html}");
+    assert!(!html.contains("<p>|"), "{html}");
+}
+
+#[test]
+fn table_empty_cell_keeps_columns() {
+    let html = Org::parse("| column 1 | column 2 |\n|          | column 2 |\n").to_html();
+    assert!(
+        html.contains("<tr><td>column 1</td><td>column 2</td></tr>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<tr><td></td><td>column 2</td></tr>"),
+        "{html}"
+    );
+}
