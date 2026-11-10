@@ -118,10 +118,9 @@ So the Rust nom parser is slower than the hand-written JS one on this workload: 
 against about 14 MB/s. The Rust numbers are for the wasm module; the Rust parser is not
 cheap per node (green nodes, then a second walk, then the buffer). Not tuned in this spike.
 
-**No incremental reparse in the Rust crate** (nothing in `src/` reparses or reuses nodes; `Org::parse`
-builds a whole `GreenNode`). The JS parser reuses unchanged top-level sections through Lezer
+**Incremental reparse:** the crate inherits orgize's `Org::replace_range` (src/replace.rs), which re-parses only the affected headline/section when the edit is inside one, and rowan green nodes are shareable. It is not exposed through wasm, not Lezer-fragment aware, and its output is a new green tree, so the converter would still walk the whole tree and rebuild the full buffer each time (only the parse step shrinks). Not measured. The JS parser reuses unchanged top-level sections through Lezer
 fragments, so on an edit it re-parses only one section. On a 200 KB document with many headlines the
-JS cost per keystroke is a fraction of the 14.6 ms; the wasm path would pay the full 28 ms every
+JS cost per keystroke is a fraction of the 14.6 ms; the wasm path as built pays the full 28 ms every
 keystroke, on the main thread unless moved to a worker. A 1 MB flat document costs 80 ms per keystroke
 in either parser; JS cannot reuse anything there either.
 
@@ -140,7 +139,7 @@ in either parser; JS cannot reuse anything there either.
 converter the Rust CST matches the JS vocabulary on 94% of nodes and on 100% of nodes in ordinary
 documents except citations. The obstacles are performance and typing-time behaviour:
 
-1. Rust is about 2x slower per parse than JS on a typical document and has no incremental reparse, while JS
+1. Rust is about 2x slower per parse than JS on a typical document and has no host-usable incremental path (`replace_range` is not wired to wasm and the buffer is rebuilt in full), while JS
    reuses all unchanged sections. For an editor that re-parses on every keystroke this is a regression
    unless the parse moves off the main thread or Rust learns to reparse a section.
 2. The editor must handle half-typed text (unclosed blocks, unfinished links). The JS parser was written for
@@ -148,7 +147,7 @@ documents except citations. The obstacles are performance and typing-time behavi
 3. Plain links, keyword-value inline markup, citations and multi-line footnotes would all have to be added
    to the Rust parser first, and the JS parser's 15 consumers rely on them.
 
-What would change the answer, in order of value: (a) section-level incremental parse in Rust (split the text
+What would change the answer, in order of value: (a) section-level incremental parse (wire `replace_range` or split the text
 at headline lines in Rust the way `parseOrg` does and cache per-section buffers on the host; this is cheap:
 the host can do it with `lezer_parse` on slices and shift offsets, no change to the Rust parser); (b) Rust
 parsers for citations, plain/angle links and inline markup in keyword values; (c) unclosed-block recovery;
