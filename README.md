@@ -16,12 +16,11 @@ source blocks, and images. On top of that:
   `<span class="priority">`.
 - `SCHEDULED`, `DEADLINE` and `CLOSED` planning lines, as `<p class="planning">`.
 - `CLOCK:` entries, as `<p class="clock">`.
-- Footnote references and definitions.
-- Table captions from `#+CAPTION:`.
+- Footnotes, numbered in order of reference, with their text collected at the
+  end of the document.
+- Table captions from `#+CAPTION:`, with math and markup rendered.
 - Math, kept as TeX and escaped inside a span tagged `data-math-style="inline"`
   or `"display"`. Typesetting is the host's.
-- Block elements carry `data-source="START-END"`, their byte range in the
-  source.
 
 The page it produces is self-contained: styles inline, no webfonts, no
 scripts, nothing to fetch.
@@ -29,9 +28,6 @@ scripts, nothing to fetch.
 ## What does not work yet
 
 - Babel code blocks are shown as source and never executed.
-- A table caption is plain text: math and markup inside it are not rendered.
-- An anonymous inline footnote shows an empty `[]` marker, and inline footnote
-  text appears in place, not collected at the end.
 - `- [[file.org::Heading]]` at the start of a list item is read as a
   description-list tag.
 - `#+OPTIONS`, macros and citations are not interpreted.
