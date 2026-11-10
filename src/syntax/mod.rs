@@ -188,6 +188,10 @@ pub enum SyntaxKind {
     SRC_BLOCK_PARAMETERS,
     EXPORT_BLOCK_TYPE,
     LATEX_ENVIRONMENT,
+    /// the value of a TITLE, SUBTITLE, AUTHOR, DATE or CAPTION keyword, parsed as objects
+    KEYWORD_VALUE,
+    /// a `#+TBLFM:` line belonging to the table above it
+    TABLE_FORMULA,
 
     //
     // objects
@@ -304,6 +308,7 @@ impl SyntaxKind {
                 | SyntaxKind::FIXED_WIDTH
                 | SyntaxKind::RULE
                 | SyntaxKind::KEYWORD
+                | SyntaxKind::TABLE_FORMULA
                 | SyntaxKind::AFFILIATED_KEYWORD
                 | SyntaxKind::BABEL_CALL
                 | SyntaxKind::LATEX_ENVIRONMENT

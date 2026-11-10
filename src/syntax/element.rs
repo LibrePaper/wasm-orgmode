@@ -261,7 +261,9 @@ fn affiliated_keywords() {
         HASH_PLUS@26..28 "#+"
         TEXT@28..35 "CAPTION"
         COLON@35..36 ":"
-        TEXT@36..40 " abc"
+        WHITESPACE@36..37 " "
+        KEYWORD_VALUE@37..40
+          TEXT@37..40 "abc"
         NEW_LINE@40..41 "\n"
         BLANK_LINE@41..42 "\n"
       PARAGRAPH@42..57
@@ -282,7 +284,9 @@ fn affiliated_keywords() {
           HASH_PLUS@0..2 "#+"
           TEXT@2..9 "CAPTION"
           COLON@9..10 ":"
-          TEXT@10..25 " a footnote def"
+          WHITESPACE@10..11 " "
+          KEYWORD_VALUE@11..25
+            TEXT@11..25 "a footnote def"
           NEW_LINE@25..26 "\n"
         L_BRACKET@26..27 "["
         KEYWORD@27..29 "fn"
@@ -290,7 +294,9 @@ fn affiliated_keywords() {
         FN_LABEL@30..34 "WORD"
         R_BRACKET@34..35 "]"
         FN_CONTENT@35..55
-          TEXT@35..55 " https://orgmode.org"
+          TEXT@35..36 " "
+          LINK@36..55
+            LINK_PATH@36..55 "https://orgmode.org"
     "###
     );
 
@@ -304,7 +310,9 @@ fn affiliated_keywords() {
           HASH_PLUS@0..2 "#+"
           TEXT@2..9 "CAPTION"
           COLON@9..10 ":"
-          TEXT@10..25 " a footnote def"
+          WHITESPACE@10..11 " "
+          KEYWORD_VALUE@11..25
+            TEXT@11..25 "a footnote def"
           NEW_LINE@25..26 "\n"
         TEXT@26..33 "CLOCK: "
         TIMESTAMP_INACTIVE@33..55
@@ -333,7 +341,9 @@ fn affiliated_keywords() {
         HASH_PLUS@0..2 "#+"
         TEXT@2..9 "CAPTION"
         COLON@9..10 ":"
-        TEXT@10..26 " Longer caption."
+        WHITESPACE@10..11 " "
+        KEYWORD_VALUE@11..26
+          TEXT@11..26 "Longer caption."
     "###
     );
 }

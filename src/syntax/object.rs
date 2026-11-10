@@ -14,7 +14,7 @@ use super::{
     input::Input,
     latex_fragment::latex_fragment_node,
     line_break::line_break_node,
-    link::link_node,
+    link::{angle_link_node, link_node, plain_link_node, plain_link_start},
     macros::macros_node,
     radio_target::radio_target_node,
     snippet::snippet_node,
@@ -27,6 +27,8 @@ struct ObjectPositions<'a> {
     input: Input<'a>,
     pos: usize,
     finder: jetscii::BytesConst,
+    /// Yield the start of a plain link's scheme when a `:` follows one.
+    plain_links: bool,
 }
 
 impl ObjectPositions<'_> {
@@ -34,6 +36,7 @@ impl ObjectPositions<'_> {
         ObjectPositions {
             input,
             pos: 0,
+            plain_links: true,
             finder: jetscii::bytes!(
                 b'*', b'+', b'/', b'_', b'=', b'~', /* text markup */
                 b'@', /* snippet */
@@ -43,8 +46,8 @@ impl ObjectPositions<'_> {
                 b's', /* inline source */
                 b'\\', b'$', /* latex & entity */
                 b'{', /* macros */
-                b'^', /* superscript */
-                b'_'  /* subscript */
+                b'^', /* superscript, subscript */
+                b':'  /* plain link */
             ),
         }
     }
@@ -53,6 +56,7 @@ impl ObjectPositions<'_> {
         ObjectPositions {
             input,
             pos: 0,
+            plain_links: false,
             finder: jetscii::bytes!(
                 b'*', b'+', b'/', b'_', b'=', b'~', /* text markup */
                 b'\\', b'$', /* latex & entity */
@@ -66,6 +70,7 @@ impl ObjectPositions<'_> {
         ObjectPositions {
             input,
             pos: 0,
+            plain_links: false,
             finder: jetscii::bytes!(
                 b'*', b'+', b'/', b'_', b'=', b'~', /* text markup */
                 b'\\', b'$', /* latex & entity */
@@ -85,30 +90,40 @@ impl<'a> Iterator for ObjectPositions<'a> {
     type Item = (Input<'a>, Input<'a>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.input.len() < 2 || self.pos >= self.input.len() {
-            return None;
+        loop {
+            if self.input.len() < 2 || self.pos >= self.input.len() {
+                return None;
+            }
+
+            let previous = self.pos;
+            let i = self.finder.find(&self.input.as_bytes()[self.pos..])?;
+            let mut p = self.pos + i;
+
+            self.pos = p + 1;
+
+            debug_assert!(
+                previous < self.pos && self.pos <= self.input.s.len(),
+                "{} < {} < {}",
+                previous,
+                self.pos,
+                self.input.s.len()
+            );
+
+            // a valid object requires at least two characters
+            if self.input.s.len() - p < 2 {
+                return None;
+            }
+
+            if self.plain_links && self.input.as_bytes()[p] == b':' {
+                // a plain link starts at its scheme, before the colon
+                match plain_link_start(&self.input.s[..p]) {
+                    Some(start) => p = start,
+                    None => continue,
+                }
+            }
+
+            return Some(self.input.take_split(p));
         }
-
-        let previous = self.pos;
-        let i = self.finder.find(&self.input.as_bytes()[self.pos..])?;
-        let p = self.pos + i;
-
-        self.pos = p + 1;
-
-        debug_assert!(
-            previous < self.pos && self.pos <= self.input.s.len(),
-            "{} < {} < {}",
-            previous,
-            self.pos,
-            self.input.s.len()
-        );
-
-        // a valid object requires at least two characters
-        if self.input.s.len() - p < 2 {
-            return None;
-        }
-
-        Some(self.input.take_split(p))
     }
 }
 
@@ -179,7 +194,8 @@ pub fn standard_object_nodes(input: Input) -> Vec<GreenElement> {
             b'<' => radio_target_node(i)
                 .or_else(|_| target_node(i))
                 .or_else(|_| timestamp_diary_node(i))
-                .or_else(|_| timestamp_active_node(i)),
+                .or_else(|_| timestamp_active_node(i))
+                .or_else(|_| angle_link_node(i)),
             b'[' => citation_node(i)
                 .or_else(|_| cookie_node(i))
                 .or_else(|_| link_node(i))
@@ -188,7 +204,10 @@ pub fn standard_object_nodes(input: Input) -> Vec<GreenElement> {
             // NOTE: although not specified in document, inline call and inline src follows the
             // same pre tokens rule as text markup
             b'c' if emphasis::verify_pre(pre.s) => inline_call_node(i),
-            b's' if emphasis::verify_pre(pre.s) => inline_src_node(i),
+            b's' if emphasis::verify_pre(pre.s) => {
+                inline_src_node(i).or_else(|_| plain_link_node(i))
+            }
+            b'h' | b'f' | b'm' | b'd' | b'i' | b'n' | b's' => plain_link_node(i),
             b'$' => latex_fragment_node(i),
             b'\\' if !pre.s.ends_with('\\') && i.as_bytes()[1] == b'\\' => line_break_node(i),
             b'\\' => entity_node(i).or_else(|_| latex_fragment_node(i)),

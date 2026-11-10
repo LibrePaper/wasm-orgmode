@@ -44,7 +44,17 @@ pub fn title_of(source: &str) -> String {
     let keyword = document
         .keywords()
         .filter(|kw| kw.key().eq_ignore_ascii_case("TITLE"))
-        .map(|kw| kw.value().trim().to_string())
+        .map(|kw| {
+            // Markup in the value is shown as the text it marks up.
+            match kw
+                .syntax()
+                .children()
+                .find(|n| n.kind() == SyntaxKind::KEYWORD_VALUE)
+            {
+                Some(value) => plain_text(value.children_with_tokens()),
+                None => kw.value().trim().to_string(),
+            }
+        })
         .find(|value| !value.is_empty());
     if let Some(title) = keyword {
         return title;
@@ -78,6 +88,17 @@ fn push_text_tokens(node: &SyntaxNode, out: &mut String) {
         if let SyntaxElement::Token(token) = element {
             if matches!(token.kind(), SyntaxKind::TEXT | SyntaxKind::WHITESPACE) {
                 out.push_str(token.text());
+            } else if token.kind() == SyntaxKind::LINK_PATH {
+                // A link with no description reads as its target.
+                let described = token
+                    .parent()
+                    .is_some_and(|link| {
+                        link.children_with_tokens()
+                            .any(|e| e.kind() == SyntaxKind::L_BRACKET)
+                    });
+                if !described {
+                    out.push_str(token.text());
+                }
             }
         }
     }
@@ -479,7 +500,7 @@ impl Traverser for Render {
                 self.html.enter_table(&table);
                 if let Some(caption) = table.caption().and_then(|k| k.value()) {
                     self.html.push_str("<caption>");
-                    self.inline_org(caption.as_ref().trim(), ctx);
+                    self.inline_org(caption.trim(), ctx);
                     self.html.push_str("</caption>");
                 }
             }
@@ -729,7 +750,133 @@ mod tests {
     }
 
     #[test]
+    fn markup_in_title_like_keywords_is_parsed() {
+        use crate::ast::Keyword;
+        for key in ["TITLE", "SUBTITLE", "AUTHOR", "DATE", "CAPTION"] {
+            let org = Org::parse(&format!("#+{key}: A *bold* [[https://x.org][l]] $x$ \\alpha\n"));
+            let kw = org.first_node::<Keyword>().expect(key);
+            let value = kw
+                .syntax()
+                .children()
+                .find(|n| n.kind() == SyntaxKind::KEYWORD_VALUE)
+                .unwrap_or_else(|| panic!("{key} has no KEYWORD_VALUE"));
+            let kinds: Vec<_> = value.children().map(|n| n.kind()).collect();
+            assert_eq!(
+                kinds,
+                [
+                    SyntaxKind::BOLD,
+                    SyntaxKind::LINK,
+                    SyntaxKind::LATEX_FRAGMENT,
+                    SyntaxKind::ENTITY
+                ],
+                "{key}"
+            );
+            assert_eq!(kw.value(), " A *bold* [[https://x.org][l]] $x$ \\alpha");
+        }
+        // other keywords stay raw
+        let org = Org::parse("#+OPTIONS: *bold* https://x.org\n");
+        let kw = org.first_node::<crate::ast::Keyword>().unwrap();
+        assert!(kw.syntax().children().next().is_none());
+    }
+
+    #[test]
+    fn a_title_reads_without_its_markup() {
+        assert_eq!(title_of("#+TITLE: A *bold* /title/ at https://x.org\n"), "A bold title at https://x.org");
+        assert_eq!(title_of("#+TITLE: See [[https://x.org][the site]]\n"), "See the site");
+    }
+
+    #[test]
+    fn a_caption_with_a_link_renders_the_anchor() {
+        let out = render_body("#+CAPTION: From [[https://x.org][x]] and https://y.org\n| a |\n");
+        assert!(out.contains("<caption>"), "{out}");
+        assert!(out.contains("<a href=\"https://x.org\">x</a>"), "{out}");
+        assert!(out.contains("<a href=\"https://y.org\">"), "{out}");
+    }
+
+    #[test]
+    fn a_table_formula_belongs_to_the_table_and_is_not_shown() {
+        let source = "| 1 | 2 |\n| 3 | 4 |\n#+TBLFM: $2=$1*2\n\nAfter.\n";
+        let org = Org::parse(source);
+        let table = org.first_node::<crate::ast::OrgTable>().unwrap();
+        let kinds: Vec<_> = table.syntax().children().map(|n| n.kind()).collect();
+        assert_eq!(kinds.last(), Some(&SyntaxKind::TABLE_FORMULA), "{kinds:?}");
+        assert_eq!(table.tblfm().count(), 1);
+        let out = render_body(source);
+        assert!(!out.contains("TBLFM"), "{out}");
+        assert!(!out.contains("$2=$1*2"), "{out}");
+        assert!(out.contains("After."), "{out}");
+    }
+
+    #[test]
     fn a_body_has_no_main_wrapper() {
         assert!(!render_body("Hello.\n").contains("<main>"));
+    }
+}
+
+#[cfg(test)]
+mod footnote_tests {
+    use super::render_body;
+
+    #[test]
+    fn a_footnote_definition_spans_lines_until_a_definition_or_two_blank_lines() {
+        let out = render_body(
+            "A[fn:a] and B[fn:b].\n\n[fn:a] First line\nsecond line\n\nthird after one blank.\n[fn:b] Other.\n\n\nOutside.\n",
+        );
+        let notes = out.find("class=\"footnotes\"").expect("notes");
+        let one = out.find("<li id=\"fn-1\">").expect("note 1");
+        let two = out.find("<li id=\"fn-2\">").expect("note 2");
+        assert!(notes < one && one < two, "{out}");
+        assert!(out[one..two].contains("First line\nsecond line"), "{out}");
+        assert!(out[one..two].contains("third after one blank."), "{out}");
+        assert!(out[two..].contains("Other."), "{out}");
+        // the text after two blank lines is body text, before the notes
+        assert!(out[..notes].contains("Outside."), "{out}");
+        assert!(!out[two..].contains("Outside."), "{out}");
+    }
+}
+
+#[cfg(test)]
+mod unclosed_block_tests {
+    use super::render_body;
+    use crate::{ast::SourceBlock, Org, SyntaxKind};
+    use rowan::ast::AstNode;
+
+    #[test]
+    fn an_unclosed_block_runs_to_the_end_of_the_document() {
+        let source = "Intro.\n\n#+begin_src python\nprint('a')\nx = 1\n";
+        let org = Org::parse(source);
+        let block = org.first_node::<SourceBlock>().expect("a source block");
+        assert!(
+            block
+                .syntax()
+                .children()
+                .all(|n| n.kind() != SyntaxKind::BLOCK_END),
+            "no end line"
+        );
+        assert_eq!(org.document().syntax().to_string(), source, "lossless");
+        let out = render_body(source);
+        assert!(out.contains("print(&apos;a&apos;)\nx = 1"), "{out}");
+        assert!(out.contains("<pre"), "{out}");
+        assert!(!out.contains("#+begin"), "{out}");
+    }
+
+    #[test]
+    fn a_headline_ends_an_unclosed_block() {
+        let source = "* One\n#+begin_quote\nQuoted *text*.\n* Two\nAfter.\n";
+        let out = render_body(source);
+        assert!(out.contains("<blockquote"), "{out}");
+        assert!(out.contains("<b>text</b>"), "{out}");
+        let quote = out.find("<blockquote").unwrap();
+        let two = out.find("<h1>Two</h1>").expect("second headline");
+        assert!(quote < two, "{out}");
+        assert!(out[two..].contains("After."), "{out}");
+        assert!(!out[two..].contains("blockquote"), "{out}");
+    }
+
+    #[test]
+    fn a_closed_block_still_stops_at_its_end_line() {
+        let out = render_body("#+begin_src c\nint a;\n#+end_src\n\nAfter.\n");
+        assert!(out.contains("int a;"), "{out}");
+        assert!(out.contains("<p>After."), "{out}");
     }
 }

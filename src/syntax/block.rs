@@ -9,7 +9,7 @@ use nom::{
 
 use super::{
     combinator::{
-        blank_lines, eol_or_eof, line_starts_iter, node, token, trim_line_end, GreenElement,
+        blank_lines, eol_or_eof, line_ends_iter, line_starts_iter, node, token, trim_line_end, GreenElement,
         NodeBuilder,
     },
     element::element_nodes,
@@ -53,7 +53,34 @@ fn block_node_base(input: Input) -> IResult<Input, GreenElement, ()> {
         }
     }
 
-    Err(nom::Err::Error(()))
+    // No end line: while someone is typing, the block runs to the end of its
+    // section (or the document), less the blank lines that trail it.
+    let text = input.as_str();
+    let mut end = 0;
+    let mut start = 0;
+    for line_end in line_ends_iter(text) {
+        if start == line_end {
+            break;
+        }
+        if !text[start..line_end].trim().is_empty() {
+            end = line_end;
+        }
+        start = line_end;
+    }
+    let (rest, contents) = input.take_split(end);
+    let (rest, post_blank) = blank_lines(rest)?;
+
+    let mut children = vec![];
+    children.extend(affiliated_keywords);
+    children.push(block_begin);
+    children.extend(pre_blank);
+    if kind.is_greater_element() {
+        children.push(node(BLOCK_CONTENT, element_nodes(contents)?));
+    } else {
+        children.push(node(BLOCK_CONTENT, comma_quoted_text_nodes(contents)));
+    }
+    children.extend(post_blank);
+    Ok((rest, node(kind, children)))
 }
 
 fn block_begin_node(input: Input) -> IResult<Input, (GreenElement, &str), ()> {

@@ -74,6 +74,19 @@ pub fn filter_token(
     }
 }
 
+/// The source text after a keyword's colon, without the line end.
+pub(crate) fn keyword_value(keyword: &SyntaxNode) -> Option<String> {
+    let mut parts = keyword
+        .children_with_tokens()
+        .skip_while(|e| e.kind() != SyntaxKind::COLON)
+        .skip(1)
+        .take_while(|e| !matches!(e.kind(), SyntaxKind::NEW_LINE | SyntaxKind::BLANK_LINE))
+        .peekable();
+    parts.peek()?;
+    let text: String = parts.map(|e| e.to_string()).collect();
+    Some(text.trim_end().to_string())
+}
+
 /// A simple wrapper of `SyntaxToken`
 ///
 /// It implements the `AsRef<str>` and `Display` trait,
