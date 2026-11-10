@@ -15,7 +15,7 @@ use std::cmp::min;
 
 use rowan::ast::AstNode;
 
-use crate::ast::{List, Planning, Timestamp};
+use crate::ast::{Clock, List, Planning, Timestamp};
 use crate::export::{Container, Event, HtmlExport, TraversalContext, Traverser};
 use crate::page;
 use crate::{Org, SyntaxElement, SyntaxKind, SyntaxNode};
@@ -244,6 +244,14 @@ fn math_parts(raw: &str) -> (&'static str, &str) {
 }
 
 impl Render {
+    /// One clock entry, as a paragraph of its own raw text.
+    fn clock(&mut self, clock: &Clock) {
+        self.html.push_str(format!(
+            "<p class=\"clock\">{}</p>",
+            page::escape(clock.syntax().to_string().trim())
+        ));
+    }
+
     /// The planning line of a headline, as one paragraph. Nothing is written
     /// when no planning timestamp is set.
     fn planning(&mut self, planning: &Planning) {
@@ -364,11 +372,34 @@ impl Traverser for Render {
                 ));
             }
 
-            Event::Clock(clock) => {
-                self.html.push_str(format!(
-                    "<p class=\"clock\">{}</p>",
-                    page::escape(clock.syntax().to_string().trim())
-                ));
+            Event::Clock(clock) => self.clock(&clock),
+
+            // The page template supplies the `<body>`, so a document adds no
+            // wrapper of its own.
+            Event::Enter(Container::Document(_)) | Event::Leave(Container::Document(_)) => {}
+
+            // A LOGBOOK drawer is the one drawer whose clock entries are shown.
+            // Its contents are emitted here and then skipped, so they are not
+            // walked again. Skipping an Enter also suppresses its Leave, so no
+            // closing tag is needed for a drawer handled this way.
+            Event::Enter(Container::Drawer(drawer)) => {
+                if drawer.name().eq_ignore_ascii_case("LOGBOOK") {
+                    let clocks: Vec<Clock> = drawer
+                        .syntax()
+                        .descendants()
+                        .filter_map(Clock::cast)
+                        .collect();
+                    if !clocks.is_empty() {
+                        self.html.push_str("<div class=\"logbook\">");
+                        for clock in &clocks {
+                            self.clock(clock);
+                        }
+                        self.html.push_str("</div>");
+                    }
+                    ctx.skip();
+                } else {
+                    self.html.event(Event::Enter(Container::Drawer(drawer)), ctx);
+                }
             }
 
             other => self.html.event(other, ctx),
@@ -436,5 +467,39 @@ mod tests {
         assert!(out.contains("<p class=\"planning\">"), "{out}");
         assert!(out.contains("planning-scheduled"), "{out}");
         assert!(out.contains("planning-deadline"), "{out}");
+    }
+
+    #[test]
+    fn logbook_clocks_render_inside_a_logbook_div() {
+        let out = render_body(
+            "* TODO Task\nSCHEDULED: <2026-11-12 Thu>\n:LOGBOOK:\n\
+             CLOCK: [2026-11-09 Mon 09:00]--[2026-11-09 Mon 10:30] =>  1:30\n\
+             CLOCK: [2026-11-10 Tue 14:00]--[2026-11-10 Tue 15:15] =>  1:15\n\
+             :END:\nBody.\n",
+        );
+        assert!(out.contains("<div class=\"logbook\">"), "{out}");
+        assert_eq!(out.matches("<p class=\"clock\">").count(), 2, "{out}");
+        assert_eq!(out.matches("<p class=\"clock\">CLOCK:").count(), 2, "{out}");
+        assert!(out.contains("Body."), "{out}");
+    }
+
+    #[test]
+    fn a_bare_clock_line_still_renders_a_clock_paragraph() {
+        let out = render_body("* Task\nCLOCK: [2026-11-09 Mon 09:00]--[2026-11-09 Mon 10:30] =>  1:30\n");
+        assert_eq!(out.matches("<p class=\"clock\">").count(), 1, "{out}");
+    }
+
+    #[test]
+    fn other_drawers_render_no_logbook_div() {
+        let properties = render_body("* Task\n:PROPERTIES:\n:ID: abc\n:END:\n");
+        assert!(!properties.contains("class=\"logbook\""), "{properties}");
+
+        let notes = render_body("* Task\n:NOTES:\nA note.\n:END:\n");
+        assert!(!notes.contains("class=\"logbook\""), "{notes}");
+    }
+
+    #[test]
+    fn a_body_has_no_main_wrapper() {
+        assert!(!render_body("Hello.\n").contains("<main>"));
     }
 }
