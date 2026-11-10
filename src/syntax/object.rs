@@ -2,6 +2,7 @@ use nom::{IResult, InputTake};
 
 use super::{
     combinator::GreenElement,
+    citation::citation_node,
     cookie::cookie_node,
     emphasis::{
         self, bold_node, code_node, italic_node, strike_node, underline_node, verbatim_node,
@@ -147,6 +148,7 @@ pub fn minimal_object_nodes(input: Input) -> Vec<GreenElement> {
 /// - Links
 /// - Macros
 /// - Targets and Radio Targets
+/// - Citations
 /// - Statistics Cookies
 /// - Timestamps
 /// - Text Markup (bold code strike verbatim underline italic)
@@ -154,8 +156,6 @@ pub fn minimal_object_nodes(input: Input) -> Vec<GreenElement> {
 /// - Subscript and Superscript
 /// - Cloze (if `syntax-org-fc` is enabled)
 ///
-/// // todo:
-/// - Citations
 pub fn standard_object_nodes(input: Input) -> Vec<GreenElement> {
     object_nodes(
         ObjectPositions::standard,
@@ -180,7 +180,8 @@ pub fn standard_object_nodes(input: Input) -> Vec<GreenElement> {
                 .or_else(|_| target_node(i))
                 .or_else(|_| timestamp_diary_node(i))
                 .or_else(|_| timestamp_active_node(i)),
-            b'[' => cookie_node(i)
+            b'[' => citation_node(i)
+                .or_else(|_| cookie_node(i))
                 .or_else(|_| link_node(i))
                 .or_else(|_| fn_ref_node(i))
                 .or_else(|_| timestamp_inactive_node(i)),

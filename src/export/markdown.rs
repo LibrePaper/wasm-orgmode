@@ -165,6 +165,8 @@ impl Traverser for MarkdownExport {
 
             Event::LineBreak(_) => {}
 
+            Event::Citation(citation) => self.output += &citation.syntax.to_string(),
+
             Event::Snippet(_snippet) => {}
 
             Event::Rule(_) => self.output += "\n-----\n",

@@ -58,6 +58,7 @@ pub enum Event {
     Text(Token),
     Macros(Macros),
     Cookie(Cookie),
+    Citation(Citation),
     FnLabel(Token),
     InlineCall(InlineCall),
     InlineSrc(InlineSrc),

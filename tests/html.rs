@@ -241,3 +241,24 @@ fn table_empty_cell_keeps_columns() {
         "{html}"
     );
 }
+
+#[test]
+fn citations() {
+    let h = |s: &str| Org::parse(s).to_html();
+    assert_eq!(
+        h("[cite:@doe2020]"),
+        r#"<main><section><p><cite class="citation" data-keys="doe2020">(doe2020)</cite></p></section></main>"#
+    );
+    assert!(h("a [cite/p:@doe2020;@smith21] b")
+        .contains(r#"<cite class="citation" data-keys="doe2020 smith21">(doe2020; smith21)</cite>"#));
+    assert!(h("[cite/t:@doe2020]").contains(r#"data-keys="doe2020">doe2020</cite>"#));
+    assert!(h("[cite/t/b:@doe2020]").contains(r#">doe2020</cite>"#));
+    assert!(h("[cite:see @doe2020, p. 3]").contains(">(see doe2020, p. 3)</cite>"));
+    assert!(h("[cite:cf. ;@a;@b; passim]").contains(">(cf. a; b passim)</cite>"));
+    assert!(h("[cite:<b> @a&b]").contains("(&lt;b&gt; a&amp;b)"));
+    // other bracket objects are unaffected
+    assert!(!h("[fn:1] [[http://x.org][l]] [50%] [2024-01-01]").contains("cite"));
+    assert!(h("* Title [cite:@a]\n").contains("<cite"));
+    assert!(h("- item [cite:@a]\n").contains("<cite"));
+    assert!(h("| [cite:@a] |\n").contains("<cite"));
+}

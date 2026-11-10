@@ -387,6 +387,10 @@ impl Traverser for HtmlExport {
 
             Event::LineBreak(_) => self.output += "<br/>",
 
+            Event::Citation(citation) => {
+                self.output += &crate::render::citation_html(&citation);
+            }
+
             Event::Snippet(snippet) => {
                 if snippet.backend().eq_ignore_ascii_case("html") {
                     self.output += &snippet.value();
