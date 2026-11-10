@@ -142,3 +142,43 @@ pub extern "C" fn diagnostics() -> usize {
 pub extern "C" fn diagnostics_ptr() -> *const u8 {
     abi::diagnostics_ptr()
 }
+
+// ---- Lezer tree (spike librepaper#sm8z). The tree is a postorder u32 buffer,
+// four words per node [kind, from, to, size], UTF-16 offsets, root last.
+
+thread_local! {
+    static TREE: std::cell::RefCell<Vec<u32>> = const { std::cell::RefCell::new(Vec::new()) };
+    static NAMES: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+}
+
+/// Parse `source` and keep its Lezer buffer. Returns the buffer length in u32 words.
+///
+/// # Safety
+/// `source` and `len` must describe UTF-8 written into this module.
+#[no_mangle]
+pub unsafe extern "C" fn lezer_parse(source: *const u8, len: usize) -> usize {
+    let tree = crate::lezer::parse_to_buffer(abi::text_at(source, len));
+    TREE.with(|t| {
+        *t.borrow_mut() = tree;
+        t.borrow().len()
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn lezer_tree_ptr() -> *const u32 {
+    TREE.with(|t| t.borrow().as_ptr())
+}
+
+/// The node names, newline-separated, id = line index. Returns the byte length.
+#[no_mangle]
+pub extern "C" fn lezer_names_len() -> usize {
+    NAMES.with(|n| {
+        *n.borrow_mut() = crate::lezer::names();
+        n.borrow().len()
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn lezer_names_ptr() -> *const u8 {
+    NAMES.with(|n| n.borrow().as_ptr())
+}
