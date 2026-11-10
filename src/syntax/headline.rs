@@ -9,8 +9,8 @@ use nom::{
 
 use super::{
     combinator::{
-        hash_token, l_bracket_token, line_starts_iter, node, r_bracket_token, token, trim_line_end,
-        GreenElement, NodeBuilder,
+        blank_lines, hash_token, l_bracket_token, line_starts_iter, node, r_bracket_token, token,
+        trim_line_end, GreenElement, NodeBuilder,
     },
     drawer::property_drawer_node,
     element::element_nodes,
@@ -109,7 +109,11 @@ fn headline_node_base(input: Input) -> IResult<Input, GreenElement, ()> {
 pub fn section_node(input: Input) -> IResult<Input, GreenElement, ()> {
     debug_assert!(!input.is_empty());
     let (input, section) = section_text(input)?;
-    Ok((input, node(SECTION, element_nodes(section)?)))
+    // leading blank lines are tokens, not the start of a paragraph
+    let (section, pre_blank) = blank_lines(section)?;
+    let mut children = pre_blank;
+    children.extend(element_nodes(section)?);
+    Ok((input, node(SECTION, children)))
 }
 
 fn section_text(input: Input) -> IResult<Input, Input, ()> {

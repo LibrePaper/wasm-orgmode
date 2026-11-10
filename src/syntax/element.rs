@@ -29,7 +29,6 @@ use super::{
     tracing::instrument(level = "debug", skip(input), fields(input = input.s))
 )]
 pub fn element_nodes(input: Input) -> Result<Vec<GreenElement>, nom::Err<()>> {
-    debug_assert!(!input.is_empty());
     // TODO:
     // debug_assert!(
     //     blank_lines(input).unwrap().1.is_empty(),
