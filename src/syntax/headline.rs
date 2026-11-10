@@ -1,7 +1,8 @@
 use memchr::memrchr_iter;
 use nom::{
-    bytes::complete::take_while1,
-    character::complete::{anychar, space0},
+    branch::alt,
+    bytes::complete::{take_while1, take_while_m_n},
+    character::complete::space0,
     combinator::{map, opt},
     sequence::tuple,
     IResult, InputTake, Slice,
@@ -218,13 +219,22 @@ fn headline_keyword_token(input: Input) -> IResult<Input, (GreenElement, Input),
     }
 }
 
+/// The value of a priority cookie: one ASCII letter, or 1 to 2 ASCII digits
+/// (Org allows numeric priorities 0-64).
+fn priority_value(input: Input) -> IResult<Input, Input, ()> {
+    alt((
+        take_while_m_n(1, 1, |c: char| c.is_ascii_alphabetic()),
+        take_while_m_n(1, 2, |c: char| c.is_ascii_digit()),
+    ))(input)
+}
+
 fn headline_priority_node(input: Input) -> IResult<Input, (GreenElement, Input), ()> {
     let (input, node) = map(
-        tuple((l_bracket_token, hash_token, anychar, r_bracket_token)),
-        |(l_bracket, hash, char, r_bracket)| {
+        tuple((l_bracket_token, hash_token, priority_value, r_bracket_token)),
+        |(l_bracket, hash, value, r_bracket)| {
             node(
                 HEADLINE_PRIORITY,
-                [l_bracket, hash, token(TEXT, &char.to_string()), r_bracket],
+                [l_bracket, hash, token(TEXT, value.as_str()), r_bracket],
             )
         },
     )(input)?;
@@ -321,6 +331,34 @@ fn parse() {
     assert!(headline_node(("**\n", config).into()).is_err());
     assert!(headline_node(("**\r", config).into()).is_err());
     assert!(headline_node(("**\t", config).into()).is_err());
+}
+
+#[test]
+fn priority_cookie_letter_or_number() {
+    use crate::{ast::Headline, tests::to_ast};
+
+    let to_headline = to_ast::<Headline>(headline_node);
+
+    let headline = to_headline("* TODO [#A] Task");
+    assert_eq!(headline.priority().map(|t| t.to_string()), Some("A".into()));
+    assert_eq!(headline.title_raw(), "Task");
+
+    let headline = to_headline("* [#1] Task");
+    assert_eq!(headline.priority().map(|t| t.to_string()), Some("1".into()));
+    assert_eq!(headline.title_raw(), "Task");
+
+    let headline = to_headline("* TODO [#42] Task");
+    assert_eq!(headline.priority().map(|t| t.to_string()), Some("42".into()));
+    assert_eq!(headline.title_raw(), "Task");
+
+    let headline = to_headline("* [#64] Task");
+    assert_eq!(headline.priority().map(|t| t.to_string()), Some("64".into()));
+    assert_eq!(headline.title_raw(), "Task");
+
+    // Three digits are not a priority cookie: the text stays in the title.
+    let headline = to_headline("* [#123] Task");
+    assert_eq!(headline.priority().map(|t| t.to_string()), None);
+    assert_eq!(headline.title_raw(), "[#123] Task");
 }
 
 #[test]
