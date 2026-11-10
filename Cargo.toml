@@ -1,0 +1,54 @@
+# The Org-mode renderer, as a WebAssembly module.
+[package]
+name = "wasm-orgmode"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+# Never goes to crates.io: the renderers are consumed by git tag.
+publish = false
+description = "Org-mode to standalone HTML, as a WebAssembly module"
+authors = ["Vincent Arel-Bundock", "Alex Lin (poi) <poiscript@gmail.com>"]
+repository = "https://github.com/LibrePaper/wasm-orgmode"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# `exports` is on for this crate's own module, and off when another crate links
+# it as a library: a `#[no_mangle]` export belongs to exactly one cdylib, and
+# two sets of them do not link. `chrono` turns timestamps into dates, which
+# planning lines and clocks need.
+default = ["exports", "chrono"]
+exports = []
+chrono = ["dep:chrono"]
+indexmap = ["dep:indexmap"]
+tracing = ["dep:tracing"]
+syntax-org-fc = []
+
+[dependencies]
+# The shared page template, diagnostics and WebAssembly interface, pinned to
+# a tag.
+wasm-helpers = { git = "https://github.com/LibrePaper/wasm-helpers", tag = "v0.1.1" }
+bytecount = "0.6"
+cfg-if = "1.0.0"
+# Without its default features, so nothing reads a clock the module lacks.
+chrono = { version = "0.4", optional = true, default-features = false, features = ["std"] }
+indexmap = { version = "2.1", optional = true }
+jetscii = "0.5"
+memchr = "2.5"
+nom = { version = "7.1", default-features = false, features = ["std"] }
+rowan = "0.15"
+tracing = { version = "0.1", optional = true }
+
+[dev-dependencies]
+insta = "1.29"
+slugify = "0.1"
+
+# As small as it can be: this module is fetched by every editor that opens a
+# document, so its size is a cost every reader pays.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

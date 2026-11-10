@@ -1,0 +1,178 @@
+#+TITLE: Shrinkage Estimators for Small-Area Survey Data
+#+AUTHOR: A. Example and B. Placeholder
+#+OPTIONS: toc:nil num:t
+
+* Abstract
+
+We compare three shrinkage estimators for small-area means when the
+sampling variance is known only approximately. Under a normal hierarchical
+model, the *empirical Bayes* estimator dominates the unpooled mean whenever
+the between-area variance $\tau^2$ is not large relative to the sampling
+variance. We report /simulation/ evidence and an application to county-level
+unemployment, and we ship the code in =smallarea=.
+
+* Introduction
+
+Survey estimates for small areas are often too noisy to publish. A county
+with forty respondents can report an unemployment rate that is off by
+several points, and a policy reader cannot tell signal from sampling noise.
+Borrowing strength across areas is the standard remedy, and the question
+this paper answers is how much to borrow.
+
+Our contribution is threefold. First, we give a closed form for the
+shrinkage weight under approximate variances. Second, we show by simulation
+that the weight is robust to a misspecified variance. Third, we apply the
+estimator to the county panel described in [[file:data/county-panel.csv][the data appendix]], and we
+document every step in the supplementary notes.
+
+** Related work
+
+The Fay-Herriot model [fn:fh] is the usual starting point. Earlier work
+treats the variance as known; we relax that assumption and keep the
+hierarchical structure.
+
+* Model
+
+Let $y_i$ be the direct estimate for area $i$, with sampling variance $v_i$.
+The model is
+
+#+BEGIN_QUOTE
+Areas are exchangeable a priori: knowing the value in one area tells us
+something about the others, but not everything.
+#+END_QUOTE
+
+\begin{equation}
+y_i \mid \theta_i \sim N(\theta_i, v_i), \qquad \theta_i \sim N(x_i^\top \beta, \tau^2).
+\end{equation}
+
+The shrinkage weight for area $i$ is
+
+$$
+B_i = \frac{v_i}{v_i + \tau^2}, \qquad \hat\theta_i = (1 - B_i)\, y_i + B_i\, x_i^\top \hat\beta.
+$$
+
+When $\tau^2$ is large the weight $B_i$ goes to zero and the estimator
+reduces to the direct mean. When $\tau^2$ is small every area is pulled
+toward the regression prediction \(x_i^\top \hat\beta\).
+
+** Estimating the variance component
+
+We estimate $\tau^2$ by restricted maximum likelihood. The estimate is
+truncated at zero, which is the usual convention, and the standard error
+comes from the observed information matrix. Table [[tab:sim]] summarises the
+bias of the estimator over the simulation grid.
+
+* Simulation study
+
+We draw $m = 50$ areas with sample sizes between 10 and 200 and compare
+four estimators: the direct mean, the Fay-Herriot empirical Bayes estimator,
+a fully Bayesian version with a half-Cauchy prior, and a nonparametric
+shrinkage rule.
+
+#+NAME: tab:sim
+#+CAPTION: Mean squared error relative to the direct estimator, by true $\tau$.
+| Estimator         | tau = 0.5 | tau = 1.0 | tau = 2.0 |
+|-------------------+-----------+-----------+-----------|
+| Direct            | 1.00      | 1.00      | 1.00      |
+| Empirical Bayes   | 0.41      | 0.63      | 0.92      |
+| Half-Cauchy       | 0.44      | 0.65      | 0.94      |
+| Nonparametric     | 0.47      | 0.61      | 0.90      |
+
+The empirical Bayes estimator is never worse than the direct mean in these
+runs, and it is best whenever $\tau$ is small. The half-Cauchy prior is a
+little more conservative, which costs it efficiency when the truth is close
+to the prior mode.
+
+** Procedure
+
+The steps of one replicate are:
+
+1. draw the true area effects $\theta_i$ from the hierarchical model;
+2. draw the direct estimates $y_i$ with the known variances $v_i$;
+3. fit each of the four estimators on $(y, v, x)$;
+4. record the squared error of each estimate against $\theta$.
+
+Each configuration is repeated 2000 times, and the reported numbers are
+averages over replicates. The sampling variances are perturbed by up to
+twenty percent in a second run to check robustness.
+
+* Application
+
+The application uses unemployment rates for 312 counties. The direct
+estimates come from the labour-force survey and the covariates come from
+administrative records. The code for the fit is below.
+
+#+BEGIN_SRC R :results output :exports both
+library(smallarea)
+
+fit <- fay_herriot(
+  y = panel$rate,
+  v = panel$variance,
+  X = model.matrix(~ unemp_lag + log_pop, data = panel),
+  method = "reml"
+)
+
+summary(fit)
+#+END_SRC
+
+The shrinkage is largest in the counties with the smallest samples, which
+is the intended behaviour. The largest revision in the panel is about
+1.8 percentage points, in a county with fewer than twenty respondents.
+
+** Findings
+
+- Shrinkage is strongest where the sample is smallest.
+- The covariates explain about a third of the between-area variance.
+- The estimates are stable under a twenty percent perturbation of $v_i$.
+
+Ranking the counties by the shrunken estimate changes the top ten in only
+two places, which matters for the programme that uses the list.
+
+* Discussion
+
+The main limitation is the normality assumption. When the area effects are
+skewed, the weight $B_i$ is still sensible but the interval around
+$\hat\theta_i$ can be too narrow. A nonparametric alternative is available,
+and it performs about as well in the simulations, but it is harder to
+explain to a non-specialist audience.
+
+We also assume the covariates are measured without error. The application
+uses lagged administrative counts, which are close to the target quantity
+but not identical to it.
+
+** Future work
+
+The natural extension is to let the variance itself depend on area size,
+which would remove the need to treat $v_i$ as known. We have a draft
+implementation and will report it separately.
+
+* TODO Check the county panel against the 2025 revision :research:
+SCHEDULED: <2026-11-16 Mon> DEADLINE: <2026-11-30 Mon>
+:LOGBOOK:
+CLOCK: [2026-11-09 Mon 09:00]--[2026-11-09 Mon 10:30] =>  1:30
+CLOCK: [2026-11-10 Tue 14:00]--[2026-11-10 Tue 15:15] =>  1:15
+:END:
+
+The 2025 revision changed the denominator for four counties. The new file
+is in =data/revision-2025/=, and the comparison script is still to be
+written.
+
+* Conclusion
+
+Empirical Bayes shrinkage with an estimated variance component is a
+reasonable default for small-area survey estimates. It is simple to fit,
+it reduces error in every scenario we tried, and its behaviour is easy to
+explain: the noisier the estimate, the more it is pulled toward the
+prediction.
+
+* Acknowledgements
+
+We thank the reviewers for their comments on an earlier draft.
+
+* References
+
+- [[https://doi.org/10.1080/01621459.1979.10482505][Fay and Herriot (1979)]], the original model.
+- Rao, J. N. K. and Molina, I. (2015). /Small Area Estimation/, 2nd edition.
+
+[fn:fh] The model is named after its two authors and was first applied to
+income data for small places in the United States.
