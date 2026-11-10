@@ -36,9 +36,9 @@ scripts, nothing to fetch.
 
 ```sh
 rustup target add wasm32-unknown-unknown   # once
-make build      # dist/orgmode.wasm
+make build      # dist/org.wasm
 make test       # the tests, natively
-make compress   # dist/orgmode.wasm.br and .gz
+make compress   # dist/org.wasm.br and .gz
 ```
 
 ## Layout

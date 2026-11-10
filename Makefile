@@ -4,7 +4,7 @@
 # The module is built for wasm32-unknown-unknown and lands in dist/ under the
 # name a host loads it by. `rustup target add wasm32-unknown-unknown` once.
 
-MODULE  := orgmode.wasm
+MODULE  := org.wasm
 TARGET  := target/wasm32-unknown-unknown/release/wasm_orgmode.wasm
 VERSION := $(shell grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
 SOURCES := $(shell find src Cargo.toml Cargo.lock -type f 2>/dev/null)
