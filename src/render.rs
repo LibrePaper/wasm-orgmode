@@ -773,3 +773,49 @@ mod footnote_tests {
         assert!(!out[two..].contains("Outside."), "{out}");
     }
 }
+
+#[cfg(test)]
+mod unclosed_block_tests {
+    use super::render_body;
+    use crate::{ast::SourceBlock, Org, SyntaxKind};
+    use rowan::ast::AstNode;
+
+    #[test]
+    fn an_unclosed_block_runs_to_the_end_of_the_document() {
+        let source = "Intro.\n\n#+begin_src python\nprint('a')\nx = 1\n";
+        let org = Org::parse(source);
+        let block = org.first_node::<SourceBlock>().expect("a source block");
+        assert!(
+            block
+                .syntax()
+                .children()
+                .all(|n| n.kind() != SyntaxKind::BLOCK_END),
+            "no end line"
+        );
+        assert_eq!(org.document().syntax().to_string(), source, "lossless");
+        let out = render_body(source);
+        assert!(out.contains("print(&apos;a&apos;)\nx = 1"), "{out}");
+        assert!(out.contains("<pre"), "{out}");
+        assert!(!out.contains("#+begin"), "{out}");
+    }
+
+    #[test]
+    fn a_headline_ends_an_unclosed_block() {
+        let source = "* One\n#+begin_quote\nQuoted *text*.\n* Two\nAfter.\n";
+        let out = render_body(source);
+        assert!(out.contains("<blockquote"), "{out}");
+        assert!(out.contains("<b>text</b>"), "{out}");
+        let quote = out.find("<blockquote").unwrap();
+        let two = out.find("<h1>Two</h1>").expect("second headline");
+        assert!(quote < two, "{out}");
+        assert!(out[two..].contains("After."), "{out}");
+        assert!(!out[two..].contains("blockquote"), "{out}");
+    }
+
+    #[test]
+    fn a_closed_block_still_stops_at_its_end_line() {
+        let out = render_body("#+begin_src c\nint a;\n#+end_src\n\nAfter.\n");
+        assert!(out.contains("int a;"), "{out}");
+        assert!(out.contains("<p>After."), "{out}");
+    }
+}
