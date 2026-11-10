@@ -1,9 +1,8 @@
 //! Org-mode, rendered to the page a document is stored as.
 //!
 //! The HTML exporter in `crate::export` does most of the work. This module
-//! takes over the few places a LibrePaper document needs more: blocks record
-//! where they sit in the source; headlines show their TODO keyword, priority
-//! and planning; math is carried as TeX for the host to typeset; and the
+//! takes over the few places a LibrePaper document needs more: headlines show
+//! their TODO keyword, priority and planning; math is carried as TeX for the host to typeset; and the
 //! figures a document names are pointed at what the host says is there.
 //!
 //! Rendering at publish time rather than per request keeps one thing true that
@@ -15,7 +14,7 @@ use std::cmp::min;
 
 use rowan::ast::AstNode;
 
-use crate::ast::{Clock, List, Planning, Timestamp};
+use crate::ast::{Clock, Paragraph, Planning, Timestamp};
 use crate::export::{Container, Event, HtmlExport, TraversalContext, Traverser};
 use crate::page;
 use crate::{Org, SyntaxElement, SyntaxKind, SyntaxNode};
@@ -87,9 +86,7 @@ fn push_text_tokens(node: &SyntaxNode, out: &mut String) {
 /// Turns an Org source into the HTML of its body, with no page around it.
 pub fn render_body(source: &str) -> String {
     let org = Org::parse(source);
-    let mut render = Render {
-        html: HtmlExport::default(),
-    };
+    let mut render = Render::default();
     org.traverse(&mut render);
     render.html.finish()
 }
@@ -209,18 +206,43 @@ pub fn compile_with(source: &str, title: &str, assets: Resolve) -> crate::diagno
 
 /// The plain exporter, with the pieces a document needs changed. Every event
 /// this does not handle goes to the exporter unchanged.
+#[derive(Default)]
 struct Render {
     html: HtmlExport,
+    /// Labelled footnotes, by label, with the number each was given.
+    numbers: Vec<(String, usize)>,
+    /// How many footnote numbers have been handed out.
+    count: usize,
+    /// Bodies of `[fn:LABEL] text` definitions, by label.
+    definitions: Vec<(String, String)>,
+    /// Bodies of inline footnotes, by number.
+    bodies: Vec<(usize, String)>,
+    /// Footnote bodies being rendered, innermost last.
+    captures: Vec<Capture>,
 }
 
-/// The `data-source` attribute for a node: its byte range in the source.
-fn source_attr(node: &SyntaxNode) -> String {
-    let range = node.text_range();
-    format!(
-        "data-source=\"{}-{}\"",
-        u32::from(range.start()),
-        u32::from(range.end())
-    )
+/// Where the body captured for a footnote element goes when the element ends.
+enum Target {
+    /// A `[fn:LABEL] text` definition.
+    Label(String),
+    /// The body of a numbered footnote, from an inline reference.
+    Number(usize),
+    /// A body with nowhere to go.
+    Discard,
+}
+
+/// A footnote body being rendered: the output length it starts at, and where
+/// it goes.
+struct Capture {
+    mark: usize,
+    target: Target,
+}
+
+/// Whether a footnote reference has text of its own, as `[fn:LABEL:text]` does.
+fn has_text(reference: &SyntaxNode) -> bool {
+    reference
+        .children()
+        .any(|child| child.kind() == SyntaxKind::FN_CONTENT)
 }
 
 /// Splits a raw LaTeX fragment into its display style and its TeX, with the
@@ -274,6 +296,93 @@ impl Render {
                 .push_str(format!("<p class=\"planning\">{spans}</p>"));
         }
     }
+
+    /// The number of a labelled footnote, given on its first reference. The
+    /// flag says whether this reference is that first one.
+    fn number_of(&mut self, label: &str) -> (usize, bool) {
+        if let Some((_, n)) = self.numbers.iter().find(|(known, _)| known.as_str() == label) {
+            return (*n, false);
+        }
+        let n = self.fresh_number();
+        self.numbers.push((label.to_string(), n));
+        (n, true)
+    }
+
+    fn fresh_number(&mut self) -> usize {
+        self.count += 1;
+        self.count
+    }
+
+    /// The reference marker for footnote `n`. Only the first reference carries
+    /// the anchor that the notes link back to.
+    fn footnote_marker(&mut self, n: usize, first: bool) {
+        let id = if first {
+            format!(" id=\"fnref-{n}\"")
+        } else {
+            String::new()
+        };
+        self.html.push_str(format!(
+            "<sup class=\"footnote-ref\"><a href=\"#fn-{n}\"{id}>{n}</a></sup>"
+        ));
+    }
+
+    /// Ends the innermost footnote body being rendered and keeps it.
+    fn end_capture(&mut self) {
+        let Some(capture) = self.captures.pop() else {
+            return;
+        };
+        let body = self.html.split_off(capture.mark).trim().to_string();
+        match capture.target {
+            Target::Label(label) => self.definitions.push((label, body)),
+            Target::Number(n) => self.bodies.push((n, body)),
+            Target::Discard => {}
+        }
+    }
+
+    /// The body shown for footnote `n` in the notes: its inline text, else the
+    /// definition of its label, else nothing.
+    fn body_of(&self, n: usize) -> String {
+        if let Some((_, body)) = self.bodies.iter().find(|(k, _)| *k == n) {
+            return body.clone();
+        }
+        self.numbers
+            .iter()
+            .find(|(_, k)| *k == n)
+            .and_then(|(label, _)| self.definitions.iter().find(|(d, _)| d == label))
+            .map(|(_, body)| body.clone())
+            .unwrap_or_default()
+    }
+
+    /// The notes at the end of the document: one item per footnote number, in
+    /// order. Nothing is written when no footnote was referenced.
+    fn footnotes(&mut self) {
+        if self.count == 0 {
+            return;
+        }
+        self.html.push_str("<section class=\"footnotes\"><ol>");
+        for n in 1..=self.count {
+            let body = self.body_of(n);
+            self.html.push_str(format!(
+                "<li id=\"fn-{n}\">{body} <a href=\"#fnref-{n}\" class=\"footnote-back\">↩</a></li>"
+            ));
+        }
+        self.html.push_str("</ol></section>");
+    }
+
+    /// A caption's text as inline Org, rendered through this traverser so that
+    /// math and markup in it come out as they do in the body. Text that does
+    /// not parse as a paragraph is written escaped.
+    fn inline_org(&mut self, text: &str, ctx: &mut TraversalContext) {
+        let org = Org::parse(text);
+        match org.first_node::<Paragraph>() {
+            Some(paragraph) => {
+                for child in paragraph.syntax().children_with_tokens() {
+                    self.element(child, ctx);
+                }
+            }
+            None => self.html.push_str(page::escape(text)),
+        }
+    }
 }
 
 impl Traverser for Render {
@@ -281,8 +390,7 @@ impl Traverser for Render {
         match event {
             Event::Enter(Container::Headline(headline)) => {
                 let level = min(headline.level(), 6);
-                self.html
-                    .push_str(format!("<h{level} {}>", source_attr(headline.syntax())));
+                self.html.push_str(format!("<h{level}>"));
                 if let Some(keyword) = headline.todo_keyword() {
                     self.html.push_str(format!(
                         "<span class=\"todo\">{}</span> ",
@@ -306,52 +414,57 @@ impl Traverser for Render {
                 }
             }
 
-            Event::Enter(Container::Paragraph(paragraph)) => {
-                self.html
-                    .push_str(format!("<p {}>", source_attr(paragraph.syntax())));
+            Event::Enter(Container::OrgTable(table)) => {
+                self.html.enter_table(&table);
+                if let Some(caption) = table.caption().and_then(|k| k.value()) {
+                    self.html.push_str("<caption>");
+                    self.inline_org(caption.as_ref().trim(), ctx);
+                    self.html.push_str("</caption>");
+                }
             }
 
-            Event::Enter(Container::ListItem(item)) => {
-                // The exporter keeps the descriptive-list state privately, and
-                // a description item's `<dt>`/`<dd>` pair is its own. Only an
-                // ordinary item, whose parent list is not descriptive, is
-                // opened here.
-                let descriptive = item
-                    .syntax()
-                    .parent()
-                    .and_then(List::cast)
-                    .is_some_and(|list| list.is_descriptive());
-                if descriptive {
-                    self.html
-                        .event(Event::Enter(Container::ListItem(item)), ctx);
+            Event::Enter(Container::FnRef(reference)) => {
+                let label = reference
+                    .label()
+                    .map(|label| label.syntax().text().to_string())
+                    .unwrap_or_default();
+                let text = has_text(reference.syntax());
+                // An anonymous footnote, `[fn::text]`, is always a new note.
+                let (n, first) = if label.is_empty() {
+                    (self.fresh_number(), true)
                 } else {
-                    self.html
-                        .push_str(format!("<li {}>", source_attr(item.syntax())));
+                    self.number_of(&label)
+                };
+                self.footnote_marker(n, first);
+                if text {
+                    let mark = self.html.len();
+                    self.captures.push(Capture {
+                        mark,
+                        target: Target::Number(n),
+                    });
+                }
+            }
+            Event::Leave(Container::FnRef(reference)) => {
+                if has_text(reference.syntax()) {
+                    self.end_capture();
                 }
             }
 
-            Event::Enter(Container::QuoteBlock(block)) => {
-                self.html
-                    .push_str(format!("<blockquote {}>", source_attr(block.syntax())));
+            // A definition is shown in the notes at the end, not where it stands.
+            Event::Enter(Container::FnDef(definition)) => {
+                let target = match definition.label() {
+                    Some(label) => Target::Label(label.syntax().text().to_string()),
+                    None => Target::Discard,
+                };
+                let mark = self.html.len();
+                self.captures.push(Capture { mark, target });
             }
+            Event::Leave(Container::FnDef(_)) => self.end_capture(),
 
-            Event::Enter(Container::ExampleBlock(block)) => {
-                self.html.push_str(format!(
-                    "<pre class=\"example\" {}>",
-                    source_attr(block.syntax())
-                ));
-            }
-
-            Event::Enter(Container::SourceBlock(block)) => {
-                let attr = source_attr(block.syntax());
-                match block.language() {
-                    Some(language) => self.html.push_str(format!(
-                        "<pre {attr}><code class=\"language-{}\">",
-                        page::escape(&language)
-                    )),
-                    None => self.html.push_str(format!("<pre {attr}><code>")),
-                }
-            }
+            // The body of a footnote is captured as it is traversed, so its
+            // delimiters and label add nothing of their own.
+            Event::Enter(Container::FnContent(_)) | Event::Leave(Container::FnContent(_)) => {}
+            Event::FnLabel(_) => {}
 
             Event::LatexFragment(latex) => {
                 let raw = latex.syntax().to_string();
@@ -375,8 +488,9 @@ impl Traverser for Render {
             Event::Clock(clock) => self.clock(&clock),
 
             // The page template supplies the `<body>`, so a document adds no
-            // wrapper of its own.
-            Event::Enter(Container::Document(_)) | Event::Leave(Container::Document(_)) => {}
+            // wrapper of its own. Its footnotes come last.
+            Event::Enter(Container::Document(_)) => {}
+            Event::Leave(Container::Document(_)) => self.footnotes(),
 
             // A LOGBOOK drawer is the one drawer whose clock entries are shown.
             // Its contents are emitted here and then skipped, so they are not
@@ -412,9 +526,64 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_paragraph_carries_its_source_range() {
-        let out = render_body("First line.\n");
-        assert!(out.contains("<p data-source=\"0-"), "{out}");
+    fn a_paragraph_is_a_plain_p_element() {
+        let out = render_body("Hello.\n");
+        assert!(out.contains("<p>Hello."), "{out}");
+        assert!(!out.contains("data-source"), "{out}");
+    }
+
+    #[test]
+    fn a_table_caption_renders_math_and_markup() {
+        let out = render_body("#+CAPTION: Error by $\\tau$ in *bold*\n| a | b |\n| 1 | 2 |\n");
+        assert!(out.contains("<caption>"), "{out}");
+        assert!(
+            out.contains("<span data-math-style=\"inline\">\\tau</span>"),
+            "{out}"
+        );
+        assert!(out.contains("<b>bold</b>"), "{out}");
+        assert!(!out.contains('$'), "{out}");
+    }
+
+    #[test]
+    fn footnotes_are_numbered_and_collected_at_the_end() {
+        let out = render_body(
+            "A[fn:x] and B[fn:y] and again[fn:x].\n\n[fn:y] Why.\n\n[fn:x] Ex *bold*.\n",
+        );
+        assert!(out.contains("href=\"#fn-1\" id=\"fnref-1\">1</a>"), "{out}");
+        assert!(out.contains("href=\"#fn-2\" id=\"fnref-2\">2</a>"), "{out}");
+        assert_eq!(out.matches("id=\"fnref-1\"").count(), 1, "{out}");
+        assert!(!out.contains("footnote-definition"), "{out}");
+
+        let notes = out
+            .find("<section class=\"footnotes\">")
+            .expect("a footnotes section");
+        assert!(out[..notes].contains("again"), "{out}");
+        let one = out.find("<li id=\"fn-1\">").expect("note 1");
+        let two = out.find("<li id=\"fn-2\">").expect("note 2");
+        assert!(notes < one && one < two, "{out}");
+        assert!(out[one..two].contains("Ex <b>bold</b>"), "{out}");
+        assert!(out[two..].contains("Why."), "{out}");
+    }
+
+    #[test]
+    fn an_inline_footnote_is_numbered_and_its_text_moves_to_the_notes() {
+        let out = render_body("A[fn::anon note] b.\n");
+        assert_eq!(
+            out.matches("href=\"#fn-1\" id=\"fnref-1\">1</a>").count(),
+            1,
+            "{out}"
+        );
+        let notes = out
+            .find("<section class=\"footnotes\">")
+            .expect("a footnotes section");
+        assert!(!out[..notes].contains("anon note"), "{out}");
+        let one = out.find("<li id=\"fn-1\">").expect("note 1");
+        assert!(out[one..].contains("anon note"), "{out}");
+    }
+
+    #[test]
+    fn a_document_without_footnotes_has_no_notes_section() {
+        assert!(!render_body("Hello.\n").contains("class=\"footnotes\""));
     }
 
     #[test]

@@ -7,7 +7,7 @@ use std::fmt::Write as _;
 use super::event::{Container, Event};
 use super::TraversalContext;
 use super::Traverser;
-use crate::ast::token;
+use crate::ast::{token, OrgTable};
 use crate::{SyntaxElement, SyntaxKind, SyntaxNode};
 
 /// A wrapper for escaping sensitive characters in html.
@@ -77,6 +77,36 @@ impl HtmlExport {
 
     pub fn finish(self) -> String {
         self.output
+    }
+
+    /// Bytes written so far. A position taken here can be cut back to with
+    /// `split_off`.
+    pub fn len(&self) -> usize {
+        self.output.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.output.is_empty()
+    }
+
+    /// Removes and returns everything written from byte `at` on. A position at
+    /// or past the end removes nothing.
+    pub fn split_off(&mut self, at: usize) -> String {
+        if at >= self.output.len() {
+            return String::new();
+        }
+        self.output.split_off(at)
+    }
+
+    /// Opens a table: its `<table>` tag, and the state its rows are read with.
+    /// The caption is not written here, so a caller can write it its own way.
+    pub fn enter_table(&mut self, table: &OrgTable) {
+        self.output += "<table>";
+        self.table_row = if table.has_header() {
+            TableRow::HeaderRule
+        } else {
+            TableRow::BodyRule
+        };
     }
 
     /// Render syntax node to html string
@@ -264,18 +294,13 @@ impl Traverser for HtmlExport {
             }
 
             Event::Enter(Container::OrgTable(table)) => {
-                self.output += "<table>";
+                self.enter_table(&table);
                 if let Some(caption) = table.caption().and_then(|k| k.value()) {
                     let _ = write!(
                         &mut self.output,
                         "<caption>{}</caption>",
                         HtmlEscape(caption.as_ref().trim())
                     );
-                }
-                self.table_row = if table.has_header() {
-                    TableRow::HeaderRule
-                } else {
-                    TableRow::BodyRule
                 }
             }
             Event::Leave(Container::OrgTable(_)) => {
