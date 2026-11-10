@@ -86,6 +86,19 @@ child order equal, on all fixtures. These stay:
    `[@n]` counters, table.el tables, Snippets. JS reads them as text; neither side gives them a
    node.
 
+4. **Three single-snippet differences, listed in `DELIBERATE` in `tools/compare-lezer.mjs`**
+   (counted separately, 11 nodes in all):
+   - `#+BEGIN_|` (unclosed, non-word name): JS makes a Block; Rust a Paragraph, as Org does.
+   - `[fn:a]` alone on a line: JS ends the FootnoteDefinition before the `]`; Rust includes it.
+   - `Para one.\n:smile:\nPara two.`: JS ends a paragraph at a line starting with `:word:`;
+     Rust keeps one paragraph, as Org does.
+
+Comparison corpus: `tools/extract-web-snippets.mjs` pulls every Org snippet out of LibrePaper's
+web unit tests into `fixtures/web-snippets/*.json` (one fixture each) and copies the shipped
+`.org` files into `fixtures/web-org/`; `compare-lezer.mjs` runs all of them against the old JS
+parser (`OLD_PARSER`, extracted with `git show HEAD~1:web/src/lib/org-language/parser.js`).
+Affiliated keywords before every element kind are in `fixtures/affiliated-elements.org`.
+
 Not covered by fixtures: JS parser behaviour on inputs outside them (a fuzz comparison would be
 the next step), and `Entity` choice for names that only one side's entity table contains
 (Rust's table is the source for Entity nodes; text `\name` becomes LatexCommand).

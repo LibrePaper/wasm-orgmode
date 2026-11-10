@@ -1,0 +1,12 @@
+[
+ "Just a paragraph.\n\nAnother with *bold*, /italic/ and =verbatim=.\n",
+ "#+TITLE: T\n#+TODO: TODO NEXT | DONE\n\n* TODO One :a:b:\nText [[https://example.org][link]].\n** NEXT Two\n- item\n- [ ] box\n* DONE Three\n| a | b |\n|---+---|\n| 1 | 2 |\n",
+ "* H\n#+begin_src js\nconst x = 1;\n* not a headline\n#+end_src\n\n#+begin_quote\nQuoted *text*\n#+end_quote\n",
+ "* Math\nInline $x^2$ and \\(y\\), cite [cite:@smith2020;@doe], footnote[fn:1].\n\n[fn:1] A note.\n",
+ "* Größe 😀\nText with é and 😀 inside *bold*.\n",
+ "a parse that reuses every section equals a fresh parse: x",
+ "#+TODO: TODO NEXT | DONE\n\nIntro.\n\n",
+ "* TODO Section x\nParagraph x with *bold* and [[https://example.org/x][link]].\n\n- one\n- two\n\n",
+ "#+TODO: TODO NEXT | DONE",
+ "#+TODO: TODO Section | DONE"
+]

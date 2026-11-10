@@ -1,0 +1,12 @@
+[
+ "See [cite:@d|",
+ "[[|\n<<intro>>\n* Method\n:PROPERTIES:\n:CUSTOM_ID: methods\n:END:\n#+NAME: fig1",
+ "#+BEGIN_SRC\n<<hidden>>\n#+END_SRC\n# <<also>>\n<<shown>>",
+ "[[file:|",
+ "[[./|",
+ "#+INCLUDE: \"|",
+ "#+BIBLIOGRAPHY: |",
+ "#+BEGIN_|",
+ "#+TI|",
+ "#+BEGIN_SRC org\n[[file:|\n#+END_SRC"
+]

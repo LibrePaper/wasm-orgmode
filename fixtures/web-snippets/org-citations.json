@@ -1,0 +1,17 @@
+[
+ "#+TITLE: Test\n#+BIBLIOGRAPHY: refs.bib\nSome [cite:@doe2020] and [cite/t:see @roe2021 p. 3; @poe_1999].\nAn @notacite in prose.\n#+BEGIN_SRC org\n[cite:@insrc]\n#+END_SRC\n# [cite:@commented]\nCode ~[cite:@verbatim]~ here.",
+ "[cite:@open\nmore @text",
+ "mail a@b.com and [cite:@x]",
+ "See [cite:@do",
+ "See [cite:see text",
+ "Hello[cite:@doe2020] world",
+ "See [cite:@a p. 3] now",
+ "See [cite:@a p. 3;@doe] now",
+ "[cite:@a; ",
+ "[cite:@a; @doe",
+ "#+BIBLIOGRAPHY: refs.bib\n#+bibliography: \"more/other.bib\"\nText",
+ "#+TITLE: Test\n\nBody [cite:@a]",
+ "#+BIBLIOGRAPHY: refs.bib\n",
+ "#+TITLE: Test\n#+BIBLIOGRAPHY: refs.bib\n\nBody [cite:@a]",
+ "#+BIBLIOGRAPHY: a.bib\nText"
+]

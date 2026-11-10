@@ -272,3 +272,37 @@ fn plain_links_render_as_anchors() {
     let html = Org::parse("=https://a.org= [[https://b.org][b]]\n").to_html();
     assert_eq!(html.matches("<a ").count(), 1, "{html}");
 }
+
+#[test]
+fn one_line_latex_environment_is_math() {
+    let html = Org::parse("\\begin{displaymath}x\\end{displaymath}\n").to_html();
+    assert_eq!(html, "<main><section>\\begin{displaymath}x\\end{displaymath}\n</section></main>");
+    assert!(!html.contains("<p>"), "{html}");
+}
+
+#[test]
+fn latex_environment_after_affiliated_keyword_is_math() {
+    let s = "#+NAME: eq:b\n\\begin{align}\na\n\\end{align}\n";
+    let html = Org::parse(s).to_html();
+    assert_eq!(html, "<main><section>\\begin{align}\na\n\\end{align}\n</section></main>");
+    assert_eq!(Org::parse(s).to_org(), s);
+}
+
+#[test]
+fn elements_after_affiliated_keywords_keep_their_kind() {
+    for (s, tag) in [
+        ("#+NAME: x\n| a | b |\n", "<table>"),
+        ("#+CAPTION: c\n#+NAME: x\n-----\n", "<hr/>"),
+        ("#+ATTR_HTML: :a b\n- one\n- two\n", "<ul>"),
+    ] {
+        let org = Org::parse(s);
+        assert_eq!(org.to_org(), s);
+        let html = org.to_html();
+        assert!(html.contains(tag), "{s:?} -> {html}");
+        assert!(!html.contains("#+"), "{s:?} -> {html}");
+    }
+    // a drawer keeps its kind and its keywords stay out of the page
+    let s = "#+NAME: x\n:D:\nx\n:END:\n";
+    assert_eq!(Org::parse(s).to_org(), s);
+    assert!(!Org::parse(s).to_html().contains("#+"));
+}

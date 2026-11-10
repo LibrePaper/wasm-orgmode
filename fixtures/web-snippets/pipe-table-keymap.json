@@ -1,0 +1,17 @@
+[
+ "| Name | Qty |\n|---+---|\n| apple | 3 |",
+ "| Name | Qty |\n| :--- | ---: |\n| apple | 3 |",
+ "| Name  | Qty |\n|-------+-----|\n| apple | 3   |",
+ "Shift-Tab moves to the previous cell",
+ "| a | b |",
+ "| a | b |\n|   |   |",
+ "| a | b |\n|---+---|\n| c | d |",
+ "| a | b |\n|---+---|\n| c | d |\n|   |   |",
+ "plain text\n\n| a | b |",
+ "Org: a |- line at the end expands into a rule matching the table above",
+ "| a | bb |\n|-",
+ "| a | bb |\n|---+----|",
+ "Markdown: Tab realigns with the separator's alignment kept",
+ "| Name  | Qty |\n|:------|----:|\n| apple |   3 |",
+ "| a | b |\n"
+]

@@ -2,17 +2,19 @@ use std::iter::once;
 
 use memchr::memchr2_iter;
 use nom::{IResult, InputTake};
+use rowan::{Language, NodeOrToken};
 
 use super::{
     block::block_node,
     clock::clock_node,
-    combinator::GreenElement,
+    combinator::{node, GreenElement},
     comment::comment_node,
     drawer::drawer_node,
     dyn_block::dyn_block_node,
     fixed_width::fixed_width_node,
     fn_def::fn_def_node,
     input::Input,
+    OrgLanguage,
     keyword::{affiliated_keyword_nodes, keyword_node},
     latex_environment::latex_environment_node,
     list::list_node,
@@ -89,15 +91,15 @@ pub fn element_node(input: Input) -> IResult<Input, GreenElement, ()> {
         Some(b'0'..=b'9') | Some(b'*') => list_node(input),
         // clock doesn't have affiliated keywords
         Some(b'C') if !has_affiliated_keyword => clock_node(input),
-        Some(b'-') => rule_node(input).or_else(|_| list_node(input)),
-        Some(b':') => drawer_node(input).or_else(|_| fixed_width_node(input)),
+        Some(b'-') => with_affiliated(input, rule_node).or_else(|_| list_node(input)),
+        Some(b':') => with_affiliated(input, drawer_node).or_else(|_| fixed_width_node(input)),
         Some(b'|') => org_table_node(input),
-        Some(b'+') => table_el_node(input).or_else(|_| list_node(input)),
+        Some(b'+') => with_affiliated(input, table_el_node).or_else(|_| list_node(input)),
         Some(b'#') => block_node(input)
             .or_else(|_| keyword_node(input))
-            .or_else(|_| dyn_block_node(input))
+            .or_else(|_| with_affiliated(input, dyn_block_node))
             .or_else(|_| comment_node(input)),
-        Some(b'\\') => latex_environment_node(input),
+        Some(b'\\') => with_affiliated(input, latex_environment_node),
         _ => Err(nom::Err::Error(())),
     };
 
@@ -106,6 +108,28 @@ pub fn element_node(input: Input) -> IResult<Input, GreenElement, ()> {
     } else {
         result
     }
+}
+
+/// Runs an element parser that does not read affiliated keywords itself: the keywords
+/// go first among the children of the element it builds, as for tables and blocks.
+fn with_affiliated(
+    input: Input,
+    parser: fn(Input) -> IResult<Input, GreenElement, ()>,
+) -> IResult<Input, GreenElement, ()> {
+    let (i, keywords) = affiliated_keyword_nodes(input)?;
+    let (rest, element) = parser(i)?;
+    if keywords.is_empty() {
+        return Ok((rest, element));
+    }
+    let Some(green) = element.as_node() else {
+        return Err(nom::Err::Error(()));
+    };
+    let children = keywords.into_iter().chain(green.children().map(|c| match c {
+        NodeOrToken::Node(n) => NodeOrToken::Node(n.to_owned()),
+        NodeOrToken::Token(t) => NodeOrToken::Token(t.to_owned()),
+    }));
+    let children: Vec<GreenElement> = children.collect();
+    Ok((rest, node(OrgLanguage::kind_from_raw(green.kind()), children)))
 }
 
 struct ElementPositions<'a> {

@@ -147,7 +147,7 @@ impl Cx<'_> {
         self.conv_inner(node, out);
         for i in start..out.len() {
             let lead = out[i].kids.iter().take_while(|k| k.name == "Keyword").count();
-            if lead > 0 && matches!(out[i].name, "Table" | "Paragraph" | "List" | "LatexEnvironment" | "FootnoteDefinition") {
+            if lead > 0 && matches!(out[i].name, "Table" | "Paragraph" | "List" | "LatexEnvironment" | "FootnoteDefinition" | "Drawer" | "HorizontalRule") {
                 let kws: Vec<N> = out[i].kids.drain(..lead).collect();
                 let kw_end = kws.last().unwrap().to;
                 let (nf, nt) = (out[i].from, out[i].to);
@@ -271,7 +271,14 @@ impl Cx<'_> {
                 self.block(node, out);
             }
             K::LATEX_ENVIRONMENT => {
-                let (f, t) = self.trim(nf, nt);
+                // affiliated keywords come first among the children; `conv` hoists them out
+                let mut kw = vec![];
+                let mut body_from = nf;
+                for c in node.children().take_while(|c| c.kind() == K::AFFILIATED_KEYWORD) {
+                    self.conv(&c, &mut kw);
+                    body_from = self.range(&c).1;
+                }
+                let (f, t) = self.trim(body_from, nt);
                 let s = &self.src[f..t];
                 let mut kids = vec![];
                 if let Some(open) = s.find('{') {
@@ -279,20 +286,26 @@ impl Cx<'_> {
                         let bend = f + open + close + 1;
                         kids.push(n("LatexEnvBegin", f, bend, vec![n("LatexEnvName", f + open + 1, bend - 1, vec![])]));
                         if let Some(e) = s.rfind("\\end{") {
-                            if f + e >= bend {
+                            // JS emits no LatexEnvEnd for a one-line environment
+                            if f + e >= bend && s[bend - f..e].contains('\n') {
                                 kids.push(n("LatexEnvEnd", f + e, t, vec![]));
                             }
                         }
                     }
                 }
-                out.push(n("LatexEnvironment", f, t, kids));
+                kw.push(n("LatexEnvironment", f, t, kids));
+                out.append(&mut kw);
             }
 
             // ---- lesser elements. The CST groups consecutive lines; JS has one node per line.
             K::COMMENT => self.per_line("Comment", nf, nt, out),
-            K::FIXED_WIDTH => self.per_line("FixedWidth", nf, nt, out),
+            K::FIXED_WIDTH => {
+                let from = self.after_keywords(node, out);
+                self.per_line("FixedWidth", from, nt, out);
+            }
             K::RULE => {
-                let (f, t) = self.trim(nf, nt);
+                let from = self.after_keywords(node, out);
+                let (f, t) = self.trim(from, nt);
                 out.push(n("HorizontalRule", f, t, vec![]));
             }
             K::FN_DEF => {
@@ -313,7 +326,9 @@ impl Cx<'_> {
                                 let (f, t) = self.trim(f, t);
                                 let mut pk = vec![];
                                 self.kids(&c, &mut pk);
-                                kids.push(n("Paragraph", f, t, pk));
+                                if t > f {
+                                    kids.push(n("Paragraph", f, t, pk));
+                                }
                             }
                         }
                         NodeOrToken::Node(c) => self.conv(&c, &mut kids),
@@ -329,7 +344,7 @@ impl Cx<'_> {
                 let line = &self.src[f..t];
                 if !line.contains('\n') && line.len() > 6 && line[..6].eq_ignore_ascii_case("#+end_") {
                     out.push(n("BlockEnd", f, t, vec![]));
-                } else {
+                } else if t > f {
                     out.push(self.wrap("Paragraph", node));
                 }
             }
@@ -338,7 +353,30 @@ impl Cx<'_> {
             K::ORG_TABLE => out.push(self.wrap("Table", node)),
             K::ORG_TABLE_RULE_ROW => {
                 let (f, t) = self.trim(nf, nt);
-                out.push(n("TableRule", f, t, vec![]));
+                let line = &self.src[f..t];
+                // JS: a rule is only `|`, `-` and `+` ; anything else (`|---|:--:|`) is a row of cells.
+                if line.bytes().all(|c| matches!(c, b'|' | b'-' | b'+')) {
+                    out.push(n("TableRule", f, t, vec![]));
+                } else {
+                    let mut kids = vec![];
+                    let mut start = f + 1;
+                    kids.push(n("TableDelimiter", f, f + 1, vec![]));
+                    for (i, c) in line.bytes().enumerate().skip(1) {
+                        if c == b'|' {
+                            let (cf, ct) = self.trim(start, f + i);
+                            if ct > cf {
+                                kids.push(n("TableCell", cf, ct, vec![]));
+                            }
+                            kids.push(n("TableDelimiter", f + i, f + i + 1, vec![]));
+                            start = f + i + 1;
+                        }
+                    }
+                    let (cf, ct) = self.trim(start, t);
+                    if ct > cf {
+                        kids.push(n("TableCell", cf, ct, vec![]));
+                    }
+                    out.push(n("TableRow", f, t, kids));
+                }
             }
             K::ORG_TABLE_STANDARD_ROW => {
                 let mut kids = vec![];
@@ -460,9 +498,10 @@ impl Cx<'_> {
             K::LATEX_FRAGMENT => {
                 let s = &self.src[nf..nt];
                 let display = s.starts_with("$$") || s.starts_with("\\[");
-                // `\begin{x}` with no matching `\end` is only a command to JS.
-                if s.starts_with("\\begin{") || s.starts_with("\\end{") {
-                    out.push(n("LatexCommand", nf, nf + s.find('{').unwrap_or(s.len()), vec![]));
+                // `\name{arg}` (and a `\begin{x}` with no matching `\end`) is only a command to JS;
+                // what is inside the braces reads as text, with further commands.
+                if s.as_bytes().get(1).is_some_and(|c| c.is_ascii_alphabetic()) && s.starts_with('\\') {
+                    self.commands(nf, nt, out);
                     return;
                 }
                 out.push(n(if display { "DisplayMath" } else { "InlineMath" }, nf, nt, vec![]));
@@ -575,8 +614,10 @@ impl Cx<'_> {
                     }
                     // Verbatim bodies keep their leading indentation and end before the final newline.
                     let tt2 = if name == "BlockBody" { tt } else { t.saturating_sub((self.src.as_bytes()[..t].last() == Some(&b'\n')) as usize) };
-                    let ff = if name == "BlockBody" { tf } else { f };
-                    kids.push(n(name, ff, tt2, bk));
+                    // JS has no body for an empty one, and starts a BlockBody at its line start.
+                    if tt2 > f && tt > tf {
+                        kids.push(n(name, f, tt2, bk));
+                    }
                 }
                 K::BLOCK_END | K::DYN_BLOCK_END => {
                     let (f, t) = self.trim(self.range(&c).0, self.range(&c).1);
@@ -594,6 +635,17 @@ impl Cx<'_> {
         let last = kids.last().map(|k| k.to).unwrap_or(first);
         out.append(&mut before);
         out.push(n("Block", first, last, kids));
+    }
+
+    /// Converts the affiliated keywords leading `node` into siblings (JS has them as such) and
+    /// returns where the element itself starts.
+    fn after_keywords(&self, node: &SyntaxNode, out: &mut Vec<N>) -> usize {
+        let mut from = self.range(node).0;
+        for c in node.children().take_while(|c| c.kind() == K::AFFILIATED_KEYWORD) {
+            self.conv(&c, out);
+            from = self.range(&c).1;
+        }
+        from
     }
 
     fn block_begin(&self, f: usize, t: usize) -> N {

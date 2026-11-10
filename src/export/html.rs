@@ -419,7 +419,7 @@ impl Traverser for HtmlExport {
                 let _ = write!(&mut self.output, "{}", &latex.syntax);
             }
             Event::LatexEnvironment(latex) => {
-                let _ = write!(&mut self.output, "{}", &latex.syntax);
+                self.output += &latex.value();
             }
 
             // ignores keyword

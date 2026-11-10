@@ -1,0 +1,20 @@
+[
+ "| a | b |\n|---+---|\n| c | d |",
+ "|:---|:---:|---:|\n| x | y | z |",
+ "a | b\n--|--",
+ "  | a | b | c |\n  | d |",
+ "Org format pads to the widest cell and writes + rules",
+ "| Name  | Qty |\n|-------+-----|\n| apple | 3   |",
+ "| 中文 | x |\n| ab   | y |",
+ "| a | b | c |\n| d |   |   |",
+ "  | a |",
+ "| Name  | Qty |\n|-------|----:|\n| apple |   3 |",
+ "|  x  |\n|:---:|\n| ab  |",
+ "| a   |\n|:----|",
+ "| a   |\n|-----|",
+ "| a | bb |\n|---+---|\n| ccc | d |",
+ "pipeBlock leaves out a caption and #+TBLFM lines",
+ "Caption\n| a | b |\n|-+-|\n#+TBLFM: $1=1\nafter",
+ "| a | b |\n|-+-|",
+ "| a"
+]

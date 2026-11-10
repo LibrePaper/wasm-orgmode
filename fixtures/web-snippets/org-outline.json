@@ -1,0 +1,15 @@
+[
+ "#+TITLE: Notes\n* Intro\n** TODO [#A] Methods :tag:\n* COMMENT hidden\n#+begin_src\n* inside a block\n#+END_SRC\n*** Deep\n",
+ "#+TITLE: x\r\n* One\r\n** Two\r\n",
+ "* One",
+ "** Two",
+ "* Top\n:PROPERTIES:\n:CUSTOM_ID: top\n:END:\n* Next\n:LOGBOOK:\n- note\n:END:\n* Last\n",
+ "org outline leaves a plain heading-like line alone",
+ "*bold* text\n*\n** Real",
+ "* TODO [#A] Write :work:home:\n* DONE Ship\n* Plain :work:\n* Bare\n",
+ "* Bare\n",
+ "#+TODO: NEXT(n) | FINISHED(f) CANCELED\n#+SEQ_TODO: A B C\n* NEXT one\n* FINISHED two\n* CANCELED three\n* TODO four\n* DONE five\n* A six\n* C seven\n",
+ "# TODO [#A] Plan :work:\n",
+ "<h1>TODO Plan</h1>\n",
+ "\\section{TODO Plan}\n"
+]

@@ -7,6 +7,7 @@ mod clock;
 #[cfg(feature = "syntax-org-fc")]
 mod cloze;
 mod comment;
+mod latex_environment;
 mod document;
 mod drawer;
 mod entity;

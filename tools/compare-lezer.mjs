@@ -6,9 +6,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const WEB = "/home/vincent/.kwt/worktrees/github.com/LibrePaper/librepaper/kata-cx8b-index/web";
+// The reference is LibrePaper's old JS Org parser (deleted from the web app). Extract it:
+//   git -C <librepaper> show HEAD~1:web/src/lib/org-language/parser.js > $OLD_PARSER   (and props.js beside it)
+// and make `@lezer/*` / `@codemirror/*` resolvable from there (a node_modules symlink to web/node_modules).
+// OLD_PARSER defaults to ./old-parser.js beside this script's scratch copy; WEB is the web app
+// (for @lezer/common).
+const WEB = process.env.WEB ?? "/home/vincent/.kwt/worktrees/github.com/LibrePaper/librepaper/kata-f9qv-org-wasm-editor/web";
+const OLD_PARSER = process.env.OLD_PARSER ?? "/tmp/claude-1000/-home-vincent-repos-librepaper-librepaper/8226a0e5-7ff5-436d-9f8d-31d3ef31bb11/scratchpad/oldp/old-parser.js";
 const { NodeSet, NodeType, Tree } = await import(`${WEB}/node_modules/@lezer/common/dist/index.js`);
-const { parseOrg } = await import(`${WEB}/src/lib/org-language/parser.js`);
+const { parseOrg } = await import(OLD_PARSER);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, "..");
@@ -87,7 +93,7 @@ function chunkedBuffer(text) {
   let tops = 0;
   for (const [from, to] of spans) {
     const part = rustChunk(to < text.length ? text.slice(from, to - 1) : text.slice(from, to), todo);
-    if (text.charCodeAt(from) === 42 && starts.length) {
+    if (starts.includes(from)) {
       // exactly one top-level node, a Section
       let top = 0;
       for (let i = part.length; i > 0; i -= part[i - 1]) top++;
@@ -133,11 +139,24 @@ function findOrg(dir, out = []) {
   return out;
 }
 const fixtures = [];
-for (const p of findOrg(WEB)) fixtures.push([`web:${path.relative(WEB, p)}`, fs.readFileSync(p, "utf8")]);
 for (const p of findOrg(path.join(root, "samples"))) fixtures.push([`samples/${path.basename(p)}`, fs.readFileSync(p, "utf8")]);
-for (const p of findOrg(path.join(root, "fixtures"))) fixtures.push([`fixtures/${path.basename(p)}`, fs.readFileSync(p, "utf8")]);
+for (const p of findOrg(path.join(root, "fixtures"))) fixtures.push([`fixtures/${path.relative(path.join(root, "fixtures"), p)}`, fs.readFileSync(p, "utf8")]);
+// Org snippets of LibrePaper's web tests (tools/extract-web-snippets.mjs): one fixture each.
+const snippetDir = path.join(root, "fixtures/web-snippets");
+if (fs.existsSync(snippetDir)) {
+  for (const f of fs.readdirSync(snippetDir).filter((n) => n.endsWith(".json")).sort()) {
+    JSON.parse(fs.readFileSync(path.join(snippetDir, f), "utf8")).forEach((t, i) => fixtures.push([`snippet:${f.replace(/\.json$/, "")}#${i}`, t]));
+  }
+}
+console.log(`${fixtures.length} fixtures`);
 
-const totals = { jsOnly: new Map(), rustOnly: new Map(), match: 0, jsNodes: 0, order: 0, chunk: 0, intended: 0 };
+// Differences left on purpose (see NOTES-lezer.md), by exact fixture text.
+const DELIBERATE = new Map([
+  ["#+BEGIN_|", "an unclosed #+BEGIN_ with a non-word name: JS makes a Block, Org (and Rust) a paragraph"],
+  ["* Intro\n[fn:a]\n", "an empty footnote definition: JS ends it before the closing bracket, Rust includes it"],
+  ["Para one.\n:smile:\nPara two.\n", "a line starting with :word: ends a JS paragraph; in Org (and Rust) it does not"],
+]);
+const totals = { deliberate: 0,  jsOnly: new Map(), rustOnly: new Map(), match: 0, jsNodes: 0, order: 0, chunk: 0, intended: 0 };
 const bump = (m, k) => m.set(k, (m.get(k) ?? 0) + 1);
 const sample = new Map(); // "js-only Name" -> examples
 
@@ -153,6 +172,10 @@ for (const [label, text] of fixtures) {
   const intended = d.jsOnly.filter(inside).length + spans.length;
   d.jsOnly = d.jsOnly.filter((k) => !inside(k));
   d.rustOnly = d.rustOnly.filter((k) => !k.startsWith("DisplayMath\t"));
+  if (DELIBERATE.has(text)) {
+    totals.deliberate += d.jsOnly.length + d.rustOnly.length;
+    d.jsOnly = []; d.rustOnly = [];
+  }
   totals.intended += intended;
   totals.jsNodes += a.length;
   totals.match += a.length - d.jsOnly.length;
@@ -184,6 +207,7 @@ for (const [label, text] of fixtures) {
 
 const table = (m) => [...m].sort((p, q) => q[1] - p[1]).map(([k, v]) => `${k}=${v}`).join(", ");
 console.log(`\nfixtures with only a child-order difference: ${totals.order}; chunked != whole: ${totals.chunk}; nodes in intended multi-line DisplayMath differences: ${totals.intended}`);
+console.log(`deliberate differences (DELIBERATE): ${totals.deliberate} nodes`);
 console.log(`UNEXPLAINED differences: ${[...totals.jsOnly.values(), ...totals.rustOnly.values()].reduce((p, q) => p + q, 0)}`);
 console.log(`TOTAL: ${totals.match}/${totals.jsNodes} JS nodes matched exactly (name+from+to)`);
 console.log(`JS-only by name:   ${table(totals.jsOnly)}`);

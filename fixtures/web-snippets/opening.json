@@ -1,0 +1,12 @@
+[
+ "x: opening",
+ "x: includers",
+ "x: x renders alone",
+ "#include \"b.typ\"\n",
+ "#include \"a.typ\"\n",
+ "\\newcommand{\\x}{x}\n",
+ "\\input{shared}\n",
+ "\\documentclass{article}\n\\input{chapter}\n",
+ "\\documentclass{article}\n\\input{macros}\n",
+ "opening: all checks passed"
+]

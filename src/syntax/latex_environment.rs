@@ -29,7 +29,16 @@ fn latex_environment_node_base(input: Input) -> IResult<Input, GreenElement, ()>
         r_curly_token,
     ))(input)?;
 
-    for (input, contents) in line_starts_iter(input.s).map(|i| input.take_split(i)) {
+    // `\begin{x}text\end{x}` on one line: the end tag need not start the line.
+    let line_len = input.s.find(['\r', '\n']).unwrap_or(input.s.len());
+    let end_tag = format!("\\end{{{}}}", name1.s);
+    let mut starts: Vec<usize> = line_starts_iter(input.s).collect();
+    if let Some(at) = input.s[..line_len].find(&end_tag) {
+        if at > 0 {
+            starts.insert(0, at);
+        }
+    }
+    for (input, contents) in starts.into_iter().map(|i| input.take_split(i)) {
         if let Ok((input, (ws2, end, l2, name2, r2, ws3, nl))) = tuple((
             space0,
             tag("\\end"),
@@ -132,4 +141,26 @@ fn blank_lines_after_an_environment_open_no_paragraph() {
     let org = crate::Org::parse(s);
     assert_eq!(org.to_org(), s);
     assert!(!org.to_html().contains("<p></p>"), "{}", org.to_html());
+}
+
+#[test]
+fn one_line_environment_and_affiliated_keywords() {
+    use crate::SyntaxKind;
+    let org = crate::Org::parse("\\begin{displaymath}x\\end{displaymath}\n");
+    let root = crate::SyntaxNode::new_root(org.green().clone());
+    assert!(root.descendants().any(|n| n.kind() == SyntaxKind::LATEX_ENVIRONMENT));
+    assert!(!root.descendants().any(|n| n.kind() == SyntaxKind::LATEX_FRAGMENT));
+
+    let s = "#+NAME: eq:b\n\\begin{align}\na\n\\end{align}\n";
+    let org = crate::Org::parse(s);
+    assert_eq!(org.to_org(), s);
+    let root = crate::SyntaxNode::new_root(org.green().clone());
+    let env = root.descendants().find(|n| n.kind() == SyntaxKind::LATEX_ENVIRONMENT).unwrap();
+    assert_eq!(env.first_child().unwrap().kind(), SyntaxKind::AFFILIATED_KEYWORD);
+    assert!(!root.descendants().any(|n| n.kind() == SyntaxKind::LATEX_FRAGMENT));
+
+    // text after the end tag on the same line is not an environment
+    let org = crate::Org::parse("\\begin{x}a\\end{x} tail\n");
+    let root = crate::SyntaxNode::new_root(org.green().clone());
+    assert!(!root.descendants().any(|n| n.kind() == SyntaxKind::LATEX_ENVIRONMENT));
 }

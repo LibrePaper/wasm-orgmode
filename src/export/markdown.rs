@@ -177,7 +177,7 @@ impl Traverser for MarkdownExport {
                 let _ = write!(&mut self.output, "{}", &latex.syntax);
             }
             Event::LatexEnvironment(latex) => {
-                let _ = write!(&mut self.output, "{}", &latex.syntax);
+                self.output += &latex.value();
             }
 
             Event::Entity(entity) => self.output += entity.utf8(),

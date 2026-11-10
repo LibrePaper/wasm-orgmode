@@ -1,0 +1,9 @@
+[
+ "#+TITLE: A Study\n#+AUTHOR: Zzyzx Qwfp\n#+LANGUAGE: fr\n\n* TODO [#A] Methods :draft:\n:PROPERTIES:\n:CUSTOM_ID: meth\n:END:\n\nWe used *bold* text, ~kode~, $xqz$, [[https://exmpl.org][a link]], [cite:@doe2020] and [fn::a note].\n\n#+BEGIN_SRC R\nzzfunc()\n#+END_SRC\n\n- first item\n- second item\n\n| alpha | beta |\n| gamma | delta |\n",
+ "* Heading\n\nOne two three.\n\n#+BEGIN_SRC R\nx <- 1\n#+END_SRC\n",
+ "#+language: en\n* Hi",
+ "* Just a headline\n",
+ "Para one.\n:smile:\nPara two.\n",
+ "* H\n:PROPERTIES:\n:ID: zzid\n:END:\nBody.\n",
+ "Before words.\n#+BEGIN_SRC R\nx <- 1\nmore code"
+]

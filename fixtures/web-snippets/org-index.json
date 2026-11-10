@@ -1,0 +1,13 @@
+[
+ "#+TITLE: Paper\n* Introduction\n:PROPERTIES:\n:CUSTOM_ID: intro\n:END:\nSee <<eq-one>> and [cite:@doe2020;@roe2021].\n#+NAME: tbl-results\n#+CAPTION: Results table\n| a | b |\n|---+---|\n| 1 | 2 |\n\n#+NAME: fig-plot\n#+CAPTION: A plot\n[[file:plot.png]]\n\n#+BIBLIOGRAPHY: refs.bib\n#+INCLUDE: \"sections/a.org\"\n\n#+begin_src org\n[cite:@hidden]\n<<not-a-label>>\n#+end_src\n",
+ "| a | b |",
+ "* Results\n* TODO Discussion\n\n#+NAME: listing-one\n#+begin_src python\nprint(1)\n#+end_src\n\n#+NAME: eq-named\n\\begin{equation}\na = b \\label{eq-inside}\n\\end{equation}\n\nA <<<radio>>> and <<spot>>.\n\n#+NAME: note-words\nJust words.\n",
+ "\\label{eq-inside}",
+ "a #+NAME on a math environment does not repeat its \\label",
+ "#+NAME: e1\n\\begin{equation}\n\\label{e1}\n\\end{equation}\n",
+ "* Introduction\n:PROPERTIES:\n:CUSTOM_ID: intro\n:END:\n* TODO Methods\nSee [[#intro]], [[*Methods]] and [[*TODO Methods]].\nTable [[tbl-results]], figure [[eq-one]] and broken [[#nope]].\nNotes[fn:x] and [fn:y:inline text] and [fn::anon] and [fn:missing].\n\n#+NAME: tbl-results\n| a |\n\nSee <<eq-one>>.\n\n[fn:x] The first note.\n\n#+begin_src org\n[[#hidden]] [fn:hidden]\n#+end_src\n",
+ "* TODO Methods",
+ "Text[fn:a] and [fn:b:inline].\n\n[fn:a] Def A.\n",
+ "[[https://example.com]] [[file:notes.org]] [[./other.org]] [[../up.org]]\n[[/abs.org]] [[~/home.org]] [[id:abc-123]] [[mailto:a@b.c]] [[notes.org::#intro]]\n[[file:plot.png]] https://example.org/plain <mailto:x@y.z>\n",
+ "#+TITLE: A *bold* title\n#+SUBTITLE: Sub\n#+AUTHOR: Ada Lovelace\n#+DATE: 2026-11-10\n#+LANGUAGE: fr\n#+begin_abstract\nFirst [[https://example.com][paragraph]] of the abstract.\n\nSecond paragraph.\n#+end_abstract\n\n* Body"
+]

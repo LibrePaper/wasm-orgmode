@@ -1,0 +1,54 @@
+\begin{displaymath}x\end{displaymath}
+
+  \begin{equation}y\end{equation}
+
+#+NAME: eq:b
+\begin{align}
+a
+\end{align}
+
+#+CAPTION: t
+#+NAME: tab
+| a | b |
+|---+---|
+| 1 | 2 |
+
+#+NAME: s
+#+begin_src python
+x
+#+end_src
+
+#+NAME: e
+#+begin_example
+x
+#+end_example
+
+#+ATTR_HTML: :a b
+#+begin_quote
+q
+#+end_quote
+
+#+CAPTION: img
+#+ATTR_HTML: :width 3
+[[./a.png]]
+
+#+NAME: l
+- one
+- two
+
+#+NAME: n
+1. one
+
+#+NAME: d
+:MYDRAWER:
+x
+:END:
+
+#+NAME: f
+: fixed
+
+#+NAME: r
+-----
+
+#+NAME: p
+plain text

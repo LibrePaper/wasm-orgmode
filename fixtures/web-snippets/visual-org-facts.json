@@ -1,0 +1,17 @@
+[
+ "* One\n** Two\n*** Three\n* Four\n",
+ "** Two",
+ "#+OPTIONS: num:nil\n* One\n** Two\n",
+ "#+OPTIONS: toc:nil num:2\n* One\n** Two\n*** Three\n* Four\n",
+ "* One\n* Plain\n:PROPERTIES:\n:UNNUMBERED: t\n:END:\n** Child\n* Hidden :noexport:\n** Sub\n* Two\n",
+ "* Intro\n:PROPERTIES:\n:CUSTOM_ID: intro\n:END:\n** TODO [#A] Methods :tag:\nA word <<anchor>> in a paragraph.\n",
+ "*Intro",
+ "*Methods",
+ "#+NAME: bare\n| a |\n\n#+NAME: tab\n#+CAPTION: Results\n| b |\n\n#+NAME: fig\n#+CAPTION: A chart\n[[file:chart.png]]\n\n[[file:plain.png]]\n\n#+CAPTION: Second table\n| c |\n",
+ "\\begin{equation*}\na\n\\end{equation*}\n\n#+NAME: one\n\\begin{equation}\nb = 1\n\\end{equation}\n\n#+NAME: two\n\\begin{align}\nc = 2\n\\end{align}\n",
+ "#+NAME: code\n#+CAPTION: A script\n#+begin_src python\nx = 1\n#+end_src\n",
+ "* One\nSee [cite:@b].\n\n#+INCLUDE: \"sub.org\"\n\n[cite:@c;@a]\n#+begin_src org\n[cite:@x]\n#+end_src\n",
+ "* Sub\n[cite:@a]\n",
+ "#+CITE_EXPORT: x\n",
+ "* One\n"
+]
