@@ -90,7 +90,7 @@ paragraph 3
 paragraph 4
 "#).to_html(),
         @r###"
-    <main><h1>title</h1><section><p></p><p>paragraph 1
+    <main><h1>title</h1><section><p>paragraph 1
     </p><p>paragraph 2
     </p><p>paragraph 3
     </p><p>paragraph 4
@@ -219,7 +219,9 @@ fn round_trip_blank_lines_after_headline() {
     for s in inputs {
         assert_eq!(Org::parse(s).to_org(), s, "input: {s:?}");
     }
+}
 
+#[test]
 fn table_caption() {
     let html = Org::parse("#+NAME: t\n#+CAPTION: cap\n| a | b |\n|---+---|\n| 1 | 2 |\n").to_html();
     assert!(html.contains("<table>"), "{html}");

@@ -223,12 +223,12 @@ fn headline_keyword_token(input: Input) -> IResult<Input, (GreenElement, Input),
     }
 }
 
-/// The value of a priority cookie: one ASCII letter, or 1 to 2 ASCII digits
-/// (Org allows numeric priorities 0-64).
+/// The value of a priority cookie: a two-digit number (Org allows numeric
+/// priorities up to 64), or any single character.
 fn priority_value(input: Input) -> IResult<Input, Input, ()> {
     alt((
-        take_while_m_n(1, 1, |c: char| c.is_ascii_alphabetic()),
-        take_while_m_n(1, 2, |c: char| c.is_ascii_digit()),
+        take_while_m_n(2, 2, |c: char| c.is_ascii_digit()),
+        take_while_m_n(1, 1, |c: char| c != ']' && !c.is_whitespace()),
     ))(input)
 }
 
@@ -275,8 +275,7 @@ fn parse() {
         TEXT@2..5 "foo"
       NEW_LINE@5..6 "\n"
       SECTION@6..7
-        PARAGRAPH@6..7
-          BLANK_LINE@6..7 "\n"
+        BLANK_LINE@6..7 "\n"
       HEADLINE@7..13
         HEADLINE_STARS@7..9 "**"
         WHITESPACE@9..10 " "
