@@ -2,6 +2,7 @@ mod generated;
 
 mod affiliated_keyword;
 mod block;
+mod citation;
 mod clock;
 #[cfg(feature = "syntax-org-fc")]
 mod cloze;
@@ -24,6 +25,7 @@ mod timestamp;
 
 #[cfg(feature = "syntax-org-fc")]
 pub use cloze::*;
+pub use citation::*;
 pub use generated::*;
 pub use headline::*;
 pub use rowan::ast::support::*;

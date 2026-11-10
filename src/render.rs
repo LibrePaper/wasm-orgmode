@@ -14,7 +14,7 @@ use std::cmp::min;
 
 use rowan::ast::AstNode;
 
-use crate::ast::{Clock, Paragraph, Planning, Timestamp};
+use crate::ast::{Citation, Clock, Paragraph, Planning, Timestamp};
 use crate::export::{Container, Event, HtmlExport, TraversalContext, Traverser};
 use crate::page;
 use crate::{Org, SyntaxElement, SyntaxKind, SyntaxNode};
@@ -239,6 +239,67 @@ struct Capture {
 }
 
 /// Whether a footnote reference has text of its own, as `[fn:LABEL:text]` does.
+/// Placeholder citation rendering: the keys as written, parenthesised unless
+/// the style is textual (`/t`, `/text`). A later module will replace this
+/// with CSL-formatted output; `data-keys` is what that module will read.
+pub(crate) fn citation_html(citation: &Citation) -> String {
+    use crate::SyntaxKind::*;
+    let text_of = |n: &SyntaxNode| page::escape(n.text().to_string().trim()).to_string();
+    let (mut keys, mut shown) = (Vec::new(), Vec::new());
+    let (mut head, mut tail) = (String::new(), String::new());
+    for child in citation.syntax().children() {
+        match child.kind() {
+            CITATION_PREFIX => head = text_of(&child),
+            CITATION_SUFFIX => tail = text_of(&child),
+            CITATION_REFERENCE => {
+                let mut one = String::new();
+                for part in child.children_with_tokens() {
+                    match part.kind() {
+                        CITATION_PREFIX | CITATION_SUFFIX => {
+                            let t = match &part {
+                                SyntaxElement::Node(n) => text_of(n),
+                                _ => String::new(),
+                            };
+                            if t.is_empty() {
+                            } else if part.kind() == CITATION_PREFIX {
+                                one.push_str(&t);
+                                one.push(' ');
+                            } else if t.starts_with(|c: char| c.is_alphanumeric()) {
+                                one.push(' ');
+                                one.push_str(&t);
+                            } else {
+                                one.push_str(&t);
+                            }
+                        }
+                        CITATION_KEY => {
+                            if let SyntaxElement::Token(t) = &part {
+                                keys.push(t.text().to_string());
+                                one.push_str(&page::escape(t.text()));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                shown.push(one);
+            }
+            _ => {}
+        }
+    }
+    let mut body = shown.join("; ");
+    if !head.is_empty() {
+        body = format!("{head} {body}");
+    }
+    if !tail.is_empty() {
+        body = format!("{body}{}{tail}", if tail.starts_with(|c: char| c.is_alphanumeric()) { " " } else { "" });
+    }
+    let textual = matches!(citation.style().as_deref().map(|s| s.split('/').next().unwrap_or("")), Some("t" | "text"));
+    let body = if textual { body } else { format!("({body})") };
+    format!(
+        "<cite class=\"citation\" data-keys=\"{}\">{body}</cite>",
+        page::escape(&keys.join(" "))
+    )
+}
+
 fn has_text(reference: &SyntaxNode) -> bool {
     reference
         .children()

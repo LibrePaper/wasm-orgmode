@@ -15,6 +15,7 @@ pub mod emphasis;
 pub mod entity;
 pub mod fixed_width;
 pub mod fn_def;
+pub mod citation;
 pub mod fn_ref;
 pub mod headline;
 pub mod inline_call;
@@ -214,6 +215,13 @@ pub enum SyntaxKind {
     ENTITY,
     SUPERSCRIPT,
     SUBSCRIPT,
+    CITATION,
+    CITATION_STYLE,
+    CITATION_REFERENCE,
+    CITATION_KEY,
+    CITATION_PREFIX,
+    CITATION_SUFFIX,
+    SEMICOLON,
 
     /* timestamp */
     TIMESTAMP_ACTIVE,
@@ -258,6 +266,7 @@ impl SyntaxKind {
                 | SyntaxKind::MACROS
                 | SyntaxKind::RADIO_TARGET
                 | SyntaxKind::COOKIE
+                | SyntaxKind::CITATION
                 | SyntaxKind::SUPERSCRIPT
                 | SyntaxKind::SUBSCRIPT
                 | SyntaxKind::ORG_TABLE_CELL
