@@ -1,0 +1,10 @@
+[fn:1] first line
+second line *bold*
+third
+
+para
+
+[fn:2] short
+
+[fn:3] with list
+- a

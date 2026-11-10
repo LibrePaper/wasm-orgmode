@@ -1,0 +1,5 @@
+#+TODO: NEXT WAIT | FIN
+* NEXT a
+** WAIT b :t:
+* FIN c
+* TODO d

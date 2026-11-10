@@ -15,6 +15,7 @@ use super::{
     element::element_nodes,
     input::Input,
     keyword::affiliated_keyword_nodes,
+    object::standard_object_nodes,
     SyntaxKind::*,
 };
 
@@ -44,6 +45,8 @@ fn block_node_base(input: Input) -> IResult<Input, GreenElement, ()> {
             children.extend(pre_blank);
             if kind.is_greater_element() {
                 children.push(node(BLOCK_CONTENT, element_nodes(contents)?));
+            } else if kind == VERSE_BLOCK {
+                children.push(node(BLOCK_CONTENT, standard_object_nodes(contents)));
             } else {
                 children.push(node(BLOCK_CONTENT, comma_quoted_text_nodes(contents)));
             }
@@ -76,6 +79,8 @@ fn block_node_base(input: Input) -> IResult<Input, GreenElement, ()> {
     children.extend(pre_blank);
     if kind.is_greater_element() {
         children.push(node(BLOCK_CONTENT, element_nodes(contents)?));
+    } else if kind == VERSE_BLOCK {
+        children.push(node(BLOCK_CONTENT, standard_object_nodes(contents)));
     } else {
         children.push(node(BLOCK_CONTENT, comma_quoted_text_nodes(contents)));
     }

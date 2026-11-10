@@ -1,0 +1,4 @@
+#+begin_verse
+Roses *are* red
+  Violets [[https://x.org][blue]]
+#+end_verse

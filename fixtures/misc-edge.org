@@ -1,0 +1,13 @@
+#+NAME: tbl
+| x | \alpha \foo |
+#+TBLFM: $1=2
+#+TBLFM: $2=3
+
+#+end_src
+
+line \\
+next \\foo [fn::anon] and \(a\) \[b\]
+[fn:9] a
+  continued
+#+CAPTION: Fig *1*
+| t |

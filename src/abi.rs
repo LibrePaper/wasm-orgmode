@@ -164,6 +164,22 @@ pub unsafe extern "C" fn lezer_parse(source: *const u8, len: usize) -> usize {
     })
 }
 
+/// Parse a chunk of a larger document (for section reuse) with TODO states the host
+/// computed for the whole document: `todo` holds the values of its `#+TODO:` lines,
+/// whitespace separated, `|` optional. Offsets are relative to the chunk. Returns the
+/// buffer length in u32 words, like `lezer_parse`.
+///
+/// # Safety
+/// Both pointer and length pairs must describe UTF-8 written into this module.
+#[no_mangle]
+pub unsafe extern "C" fn lezer_parse_chunk(source: *const u8, len: usize, todo: *const u8, todo_len: usize) -> usize {
+    let tree = crate::lezer::parse_chunk_to_buffer(abi::text_at(source, len), abi::text_at(todo, todo_len));
+    TREE.with(|t| {
+        *t.borrow_mut() = tree;
+        t.borrow().len()
+    })
+}
+
 #[no_mangle]
 pub extern "C" fn lezer_tree_ptr() -> *const u32 {
     TREE.with(|t| t.borrow().as_ptr())

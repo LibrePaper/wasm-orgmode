@@ -38,13 +38,6 @@ pub fn names() -> String {
     NAMES.split_whitespace().collect::<Vec<_>>().join("\n")
 }
 
-fn id_of(name: &str) -> u32 {
-    NAMES
-        .split_whitespace()
-        .position(|n| n == name)
-        .unwrap_or_else(|| panic!("unknown node name {name}")) as u32
-}
-
 /// Intermediate node: byte offsets into the source.
 #[derive(Debug)]
 pub struct N {
@@ -108,10 +101,34 @@ impl Cx<'_> {
                             let (f, e) = self.trim(f, e);
                             out.push(n("ListBullet", f, e, vec![]));
                         }
-                        K::FN_LABEL => out.push(n("FootnoteLabel", f, e, vec![])),
+                        K::FN_LABEL if e > f => out.push(n("FootnoteLabel", f, e, vec![])),
+                        K::TEXT => self.commands(f, e, out),
                         _ => {}
                     }
                 }
+            }
+        }
+    }
+
+    /// `\name` in plain text is a LatexCommand in JS (the CST only knows entities).
+    /// `\\` is skipped as a pair, like the JS parser does.
+    fn commands(&self, f: usize, e: usize, out: &mut Vec<N>) {
+        let b = self.src.as_bytes();
+        let mut i = f;
+        while i < e {
+            if b[i] != b'\\' {
+                i += 1;
+            } else if i + 1 < e && b[i + 1] == b'\\' {
+                i += 2;
+            } else {
+                let mut k = i + 1;
+                while k < e && b[k].is_ascii_alphabetic() {
+                    k += 1;
+                }
+                if k > i + 1 {
+                    out.push(n("LatexCommand", i, k, vec![]));
+                }
+                i = k.max(i + 1);
             }
         }
     }
@@ -217,9 +234,35 @@ impl Cx<'_> {
             }
 
             // ---- keywords (`#+KEY: value`; JS treats affiliated ones the same)
-            K::KEYWORD | K::AFFILIATED_KEYWORD | K::BABEL_CALL => {
+            K::KEYWORD | K::AFFILIATED_KEYWORD | K::BABEL_CALL | K::TABLE_FORMULA => {
                 let (f, t) = self.trim(nf, nt);
-                out.push(self.keyword(f, t));
+                let mut kw = self.keyword(f, t);
+                if node.kind() == K::TABLE_FORMULA {
+                    kw.name = "TableFormula";
+                }
+                // Inline markup in the value (TITLE, SUBTITLE, AUTHOR, DATE, CAPTION).
+                if let Some(v) = node.children().find(|c| c.kind() == K::KEYWORD_VALUE) {
+                    if let Some(kv) = kw.kids.iter_mut().find(|k| k.name == "KeywordValue") {
+                        self.kids(&v, &mut kv.kids);
+                    }
+                }
+                out.push(kw);
+            }
+
+            // ---- citations: the CST has one reference per key; JS lists the keys only
+            K::CITATION => {
+                let mut kids = vec![];
+                for r in node.descendants() {
+                    if r.kind() == K::CITATION_REFERENCE {
+                        for t in r.children_with_tokens().filter_map(|e| e.into_token()) {
+                            if t.kind() == K::CITATION_KEY {
+                                let tr = t.text_range();
+                                kids.push(n("CitationKey", usize::from(tr.start()), usize::from(tr.end()), vec![]));
+                            }
+                        }
+                    }
+                }
+                out.push(n("Citation", nf, nt, kids));
             }
 
             // ---- blocks: JS has one Block with Begin/Body/End; Rust one kind per block name
@@ -262,11 +305,16 @@ impl Cx<'_> {
                         }
                         // Rust keeps the definition's text as one FN_CONTENT; JS has a Paragraph.
                         NodeOrToken::Node(c) if c.kind() == K::FN_CONTENT => {
-                            let (f, t) = self.range(&c);
-                            let (f, t) = self.trim(f, t);
-                            let mut pk = vec![];
-                            self.kids(&c, &mut pk);
-                            kids.push(n("Paragraph", f, t, pk));
+                            if c.children().any(|k| k.kind() == K::PARAGRAPH) {
+                                // multi-line definitions: the content holds real elements
+                                self.kids(&c, &mut kids);
+                            } else {
+                                let (f, t) = self.range(&c);
+                                let (f, t) = self.trim(f, t);
+                                let mut pk = vec![];
+                                self.kids(&c, &mut pk);
+                                kids.push(n("Paragraph", f, t, pk));
+                            }
                         }
                         NodeOrToken::Node(c) => self.conv(&c, &mut kids),
                         _ => {}
@@ -275,7 +323,16 @@ impl Cx<'_> {
                 let (f, t) = self.trim(nf, nt);
                 out.push(n("FootnoteDefinition", f, t, kids));
             }
-            K::PARAGRAPH => out.push(self.wrap("Paragraph", node)),
+            K::PARAGRAPH => {
+                // A stray `#+end_x` line is a BlockEnd of its own in JS.
+                let (f, t) = self.trim(nf, nt);
+                let line = &self.src[f..t];
+                if !line.contains('\n') && line.len() > 6 && line[..6].eq_ignore_ascii_case("#+end_") {
+                    out.push(n("BlockEnd", f, t, vec![]));
+                } else {
+                    out.push(self.wrap("Paragraph", node));
+                }
+            }
 
             // ---- tables
             K::ORG_TABLE => out.push(self.wrap("Table", node)),
@@ -346,6 +403,12 @@ impl Cx<'_> {
                                 self.conv(&c, k);
                             }
                         }
+                        NodeOrToken::Token(t) if t.kind() == K::TEXT && in_desc => {
+                            let r = t.text_range();
+                            if let Some((_, _, k)) = desc.as_mut() {
+                                self.commands(usize::from(r.start()), usize::from(r.end()), k);
+                            }
+                        }
                         NodeOrToken::Token(t) if t.kind() == K::L_BRACKET && !kids.is_empty() && !in_desc => {
                             in_desc = true;
                             let p = usize::from(t.text_range().end());
@@ -397,6 +460,11 @@ impl Cx<'_> {
             K::LATEX_FRAGMENT => {
                 let s = &self.src[nf..nt];
                 let display = s.starts_with("$$") || s.starts_with("\\[");
+                // `\begin{x}` with no matching `\end` is only a command to JS.
+                if s.starts_with("\\begin{") || s.starts_with("\\end{") {
+                    out.push(n("LatexCommand", nf, nf + s.find('{').unwrap_or(s.len()), vec![]));
+                    return;
+                }
                 out.push(n(if display { "DisplayMath" } else { "InlineMath" }, nf, nt, vec![]));
             }
             K::ENTITY => out.push(n("Entity", nf, nt, vec![])),
@@ -500,6 +568,10 @@ impl Cx<'_> {
                     let mut bk = vec![];
                     if name == "BlockBody" {
                         self.kids(&c, &mut bk);
+                        // verse: the CST holds the objects directly, JS wraps them in a Paragraph
+                        if kind == K::VERSE_BLOCK && tt > tf {
+                            bk = vec![n("Paragraph", tf, tt, bk)];
+                        }
                     }
                     // Verbatim bodies keep their leading indentation and end before the final newline.
                     let tt2 = if name == "BlockBody" { tt } else { t.saturating_sub((self.src.as_bytes()[..t].last() == Some(&b'\n')) as usize) };
@@ -666,8 +738,25 @@ fn emit(node: &N, u: &Utf16, ids: &std::collections::HashMap<&str, u32>, out: &m
     out[last] = size;
 }
 
+/// Add the states of one `#+TODO:` value (`NEXT WAIT | FIN`) to `config`: everything
+/// before `|` is a todo state, after it a done state. `(x)` fast keys are dropped.
+fn add_todo_words(config: &mut ParseConfig, rest: &str) {
+    let mut done = false;
+    for w in rest.split_whitespace() {
+        if w == "|" {
+            done = true;
+            continue;
+        }
+        let name = w.split('(').next().unwrap_or(w).to_string();
+        if name.is_empty() {
+            continue;
+        }
+        if done { config.todo_keywords.1.push(name) } else { config.todo_keywords.0.push(name) }
+    }
+}
+
 /// The TODO words `#+TODO:`, `#+SEQ_TODO:` and `#+TYP_TODO:` lines declare, as
-/// the JS parser reads them: everything before `|` is a todo state, after it done.
+/// the JS parser reads them.
 pub fn config_for(src: &str) -> ParseConfig {
     let mut config = ParseConfig::default();
     for line in src.lines() {
@@ -677,20 +766,19 @@ pub fn config_for(src: &str) -> ParseConfig {
             .iter()
             .find(|p| up.starts_with(*p))
             .map(|p| &l[p.len()..]);
-        let Some(rest) = rest else { continue };
-        let mut done = false;
-        for w in rest.split_whitespace() {
-            if w == "|" {
-                done = true;
-                continue;
-            }
-            let name = w.split('(').next().unwrap_or(w).to_string();
-            if name.is_empty() {
-                continue;
-            }
-            if done { config.todo_keywords.1.push(name) } else { config.todo_keywords.0.push(name) }
+        if let Some(rest) = rest {
+            add_todo_words(&mut config, rest);
         }
     }
+    config
+}
+
+/// A config from words given by the host: the values of the document's `#+TODO:`
+/// lines, whitespace separated, `|` optional, lines may be joined with newlines.
+/// TODO and DONE are always states.
+pub fn config_with(todo_words: &str) -> ParseConfig {
+    let mut config = ParseConfig::default();
+    add_todo_words(&mut config, todo_words);
     config
 }
 
@@ -707,11 +795,21 @@ pub fn tree_of(org: &Org, src: &str) -> N {
 
 /// Parse and flatten: postorder `[kind, from, to, size]` words, UTF-16 offsets, root last.
 pub fn parse_to_buffer(src: &str) -> Vec<u32> {
-    let org = config_for(src).parse(src);
+    buffer_of(src, config_for(src))
+}
+
+/// Like [`parse_to_buffer`] for a chunk of a larger document: the TODO states come
+/// from the host (see [`config_with`]) instead of the chunk's own `#+TODO:` lines.
+/// Offsets are relative to the chunk.
+pub fn parse_chunk_to_buffer(src: &str, todo_words: &str) -> Vec<u32> {
+    buffer_of(src, config_with(todo_words))
+}
+
+fn buffer_of(src: &str, config: ParseConfig) -> Vec<u32> {
+    let org = config.parse(src);
     let doc = tree_of(&org, src);
     let ids: std::collections::HashMap<&str, u32> =
         NAMES.split_whitespace().enumerate().map(|(i, n)| (n, i as u32)).collect();
-    let _ = id_of;
     // The root is left out: `Tree.build({ topID })` supplies the Document node,
     // and a root in the buffer would nest a second Document inside it.
     let mut out = Vec::new();
@@ -732,5 +830,37 @@ mod tests {
         // One top-level Section: its size covers the whole buffer.
         assert_eq!(*b.last().unwrap() as usize, b.len());
         assert_eq!(b.len() % 4, 0);
+    }
+
+    fn names_of(b: &[u32]) -> Vec<&'static str> {
+        let names: Vec<&str> = NAMES.split_whitespace().collect();
+        b.chunks(4).map(|w| names[w[0] as usize]).collect()
+    }
+
+    #[test]
+    fn chunk_with_host_todo_words_is_one_section() {
+        let b = parse_chunk_to_buffer("* NEXT a
+text
+** WAIT b
+", "NEXT WAIT | FIN");
+        let n = names_of(&b);
+        assert_eq!(n.last(), Some(&"Section"));
+        assert_eq!(n.iter().filter(|x| **x == "TodoKeyword").count(), 2);
+        assert_eq!(*b.last().unwrap() as usize, b.len());
+        // without the words NEXT is plain title text
+        let b = parse_chunk_to_buffer("* NEXT a
+", "");
+        assert!(!names_of(&b).contains(&"TodoKeyword"));
+    }
+
+    #[test]
+    fn citation_keys_and_unclosed_block() {
+        let n = names_of(&parse_to_buffer("[cite:@a;@b]
+
+#+begin_src c
+x
+"));
+        assert_eq!(n.iter().filter(|x| **x == "CitationKey").count(), 2);
+        assert!(n.contains(&"Block") && !n.contains(&"BlockEnd"));
     }
 }

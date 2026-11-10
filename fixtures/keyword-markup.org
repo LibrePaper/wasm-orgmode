@@ -1,0 +1,8 @@
+#+TITLE: Hi *there* and /you/
+#+AUTHOR: A. =B=
+#+DATE: <2024-01-31 Wed>
+#+SUBTITLE: sub [[https://x.org][l]]
+#+CAPTION: A *bold* cap
+#+LANGUAGE: en
+
+Text.

@@ -135,7 +135,7 @@ fn fn_def_node_base(input: Input) -> IResult<Input, GreenElement, ()> {
 
             // A definition of one paragraph holds its objects; one with a blank
             // line inside holds elements.
-            let content_node = if has_inner_blank_line(content.as_str()) {
+            let content_node = if has_inner_blank_line(content.as_str()) || content.as_str().trim_end().contains('\n') {
                 let children = element_nodes(content).unwrap_or_else(|_| vec![content.text_token()]);
                 node(FN_CONTENT, children)
             } else {
