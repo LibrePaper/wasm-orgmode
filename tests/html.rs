@@ -189,3 +189,34 @@ fn footnote() {
         @r##""<main><section><p><code>org-inlinetask-min-level</code><a href=\"#footnote_oiml\" class=\"footnote-reference\">[oiml]</a><span class=\"footnote-content\" id=\"footnote_oiml\" >The default value of \n<code>org-inlinetask-min-level</code> is <code>15</code>.</span></p></section></main>""##
     );
 }
+
+#[test]
+fn headline_followed_by_blank_line_has_no_empty_paragraph() {
+    let html = Org::parse("* H\n\nPara.\n").to_html();
+    assert!(!html.contains("<p></p>"), "{html}");
+    assert!(html.contains("<p>Para."), "{html}");
+}
+
+#[test]
+fn empty_greater_blocks_do_not_panic() {
+    let html = Org::parse("#+begin_quote\n#+end_quote\n").to_html();
+    assert!(html.contains("<blockquote>"), "{html}");
+
+    let html = Org::parse("#+begin_center\n\n#+end_center\n").to_html();
+    assert!(html.contains("<div"), "{html}");
+}
+
+#[test]
+fn round_trip_blank_lines_after_headline() {
+    let inputs = [
+        "#+begin_quote\n#+end_quote\n",
+        "#+begin_center\n\n#+end_center\n",
+        "#+begin_note\n#+end_note\n",
+        "* H\n\nPara.\n",
+        "* H\n\n\n\nPara.\n",
+        "* H\n\n",
+    ];
+    for s in inputs {
+        assert_eq!(Org::parse(s).to_org(), s, "input: {s:?}");
+    }
+}
