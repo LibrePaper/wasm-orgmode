@@ -16,6 +16,8 @@ source blocks, and images. On top of that:
   `<span class="priority">`.
 - `SCHEDULED`, `DEADLINE` and `CLOSED` planning lines, as `<p class="planning">`.
 - `CLOCK:` entries, as `<p class="clock">`.
+- Footnote references and definitions.
+- Table captions from `#+CAPTION:`.
 - Math, kept as TeX and escaped inside a span tagged `data-math-style="inline"`
   or `"display"`. Typesetting is the host's.
 - Block elements carry `data-source="START-END"`, their byte range in the
@@ -26,12 +28,13 @@ scripts, nothing to fetch.
 
 ## What does not work yet
 
-- A table preceded by `#+NAME:` or `#+CAPTION:` renders as a paragraph.
-- `$x$` followed directly by punctuation is not recognised as math; `\(x\)` is.
-- Footnote references and definitions are not rendered.
-- `CLOCK:` entries inside a `:LOGBOOK:` drawer are dropped with the drawer.
-- A blank line after a headline produces an empty paragraph.
 - Babel code blocks are shown as source and never executed.
+- A table caption is plain text: math and markup inside it are not rendered.
+- An anonymous inline footnote shows an empty `[]` marker, and inline footnote
+  text appears in place, not collected at the end.
+- `- [[file.org::Heading]]` at the start of a list item is read as a
+  description-list tag.
+- `#+OPTIONS`, macros and citations are not interpreted.
 
 ## Building
 
@@ -56,6 +59,12 @@ The parser, syntax tree and exporters began as
 [orgize](https://github.com/PoiScript/orgize) by Alex Lin (poi), taken at
 commit `5f26c94` (version 0.10.0-alpha.10, July 2024) and developed here since.
 orgize is MIT licensed, and its copyright notice is kept in `LICENSE`.
+
+Two changes proposed to orgize and never merged there are included, with their
+authors' commits kept in the history: footnote support by James Liu
+([orgize#84](https://github.com/PoiScript/orgize/pull/84)) and newlines inside
+bracket links by Logan Barnett
+([orgize#94](https://github.com/PoiScript/orgize/pull/94)).
 
 ## License
 

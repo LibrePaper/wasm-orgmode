@@ -8,7 +8,7 @@ use nom::{
 use crate::SyntaxKind;
 
 use super::{
-    combinator::{eol_or_eof, l_curly_token, line_starts_iter, node, r_curly_token, GreenElement},
+    combinator::{blank_lines, eol_or_eof, l_curly_token, line_starts_iter, node, r_curly_token, GreenElement},
     input::Input,
 };
 
@@ -40,27 +40,27 @@ fn latex_environment_node_base(input: Input) -> IResult<Input, GreenElement, ()>
             eol_or_eof,
         ))(input)
         {
-            return Ok((
-                input,
-                node(
-                    SyntaxKind::LATEX_ENVIRONMENT,
-                    [
-                        ws1.ws_token(),
-                        begin.text_token(),
-                        l1,
-                        name1.text_token(),
-                        r1,
-                        contents.text_token(),
-                        ws2.ws_token(),
-                        end.text_token(),
-                        l2,
-                        name2.text_token(),
-                        r2,
-                        ws3.ws_token(),
-                        nl.nl_token(),
-                    ],
-                ),
-            ));
+            // Blank lines after the environment belong to it, as they do
+            // for every other element; left behind, they would open an
+            // empty paragraph.
+            let (input, post_blank) = blank_lines(input)?;
+            let mut children = vec![
+                ws1.ws_token(),
+                begin.text_token(),
+                l1,
+                name1.text_token(),
+                r1,
+                contents.text_token(),
+                ws2.ws_token(),
+                end.text_token(),
+                l2,
+                name2.text_token(),
+                r2,
+                ws3.ws_token(),
+                nl.nl_token(),
+            ];
+            children.extend(post_blank);
+            return Ok((input, node(SyntaxKind::LATEX_ENVIRONMENT, children)));
         }
     }
 
@@ -124,4 +124,12 @@ fn parse() {
 
     assert!(latex_environment_node((r"\begin{equation}\end{align}", &c).into()).is_err());
     assert!(latex_environment_node((r"\begin{_}\end{_}", &c).into()).is_err());
+}
+
+#[test]
+fn blank_lines_after_an_environment_open_no_paragraph() {
+    let s = "\\begin{equation}\nx\n\\end{equation}\n\nText.\n";
+    let org = crate::Org::parse(s);
+    assert_eq!(org.to_org(), s);
+    assert!(!org.to_html().contains("<p></p>"), "{}", org.to_html());
 }
