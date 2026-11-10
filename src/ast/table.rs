@@ -70,7 +70,7 @@ impl OrgTable {
     /// ```
     pub fn tblfm(&self) -> impl Iterator<Item = Token> {
         self.syntax.children().filter_map(|n| {
-            if n.kind() == SyntaxKind::KEYWORD {
+            if n.kind() == SyntaxKind::TABLE_FORMULA {
                 n.children_with_tokens()
                     .filter_map(filter_token(SyntaxKind::TEXT))
                     .last()

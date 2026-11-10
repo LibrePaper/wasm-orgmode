@@ -17,6 +17,8 @@ impl Keyword {
             .expect("keyword must contains TEXT")
     }
 
+    /// The text after the colon. Markup in a TITLE, SUBTITLE, AUTHOR, DATE or
+    /// CAPTION value is parsed, but this is still its source text.
     ///
     /// ```rust
     /// use wasm_orgmode::{Org, ast::Keyword};
@@ -25,12 +27,10 @@ impl Keyword {
     /// assert_eq!(keyword.value(), " VALUE");
     /// let keyword = Org::parse("#+KEY:").first_node::<Keyword>().unwrap();
     /// assert_eq!(keyword.value(), "");
+    /// let keyword = Org::parse("#+TITLE: A *bold* title").first_node::<Keyword>().unwrap();
+    /// assert_eq!(keyword.value(), " A *bold* title");
     /// ```
-    pub fn value(&self) -> Token {
-        self.syntax
-            .children_with_tokens()
-            .filter_map(filter_token(SyntaxKind::TEXT))
-            .nth(1)
-            .expect("keyword must contains two TEXT")
+    pub fn value(&self) -> String {
+        super::keyword_value(&self.syntax).unwrap_or_default()
     }
 }

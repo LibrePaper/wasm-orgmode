@@ -43,10 +43,17 @@ impl AffiliatedKeyword {
     /// let keyword = Org::parse("#+CAPTION[OPTIONAL]:VALUE\nabc").first_node::<AffiliatedKeyword>().unwrap();
     /// assert_eq!(keyword.value().unwrap(), "VALUE");
     /// ```
-    pub fn value(&self) -> Option<Token> {
+    pub fn value(&self) -> Option<String> {
+        super::keyword_value(&self.syntax)
+    }
+
+    /// The value as objects: the children of its `KEYWORD_VALUE` node, or its
+    /// text. Empty when there is no value.
+    pub fn value_nodes(&self) -> impl Iterator<Item = crate::SyntaxElement> {
         self.syntax
-            .children_with_tokens()
-            .filter_map(filter_token(SyntaxKind::TEXT))
-            .last()
+            .children()
+            .find(|n| n.kind() == SyntaxKind::KEYWORD_VALUE)
+            .into_iter()
+            .flat_map(|n| n.children_with_tokens())
     }
 }

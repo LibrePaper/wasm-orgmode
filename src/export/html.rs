@@ -299,7 +299,7 @@ impl Traverser for HtmlExport {
                     let _ = write!(
                         &mut self.output,
                         "<caption>{}</caption>",
-                        HtmlEscape(caption.as_ref().trim())
+                        HtmlEscape(caption.trim())
                     );
                 }
             }

@@ -208,7 +208,7 @@ r#"|
         WHITESPACE@3..4 " "
         PIPE@4..5 "|"
         WHITESPACE@5..6 "\n"
-      KEYWORD@6..19
+      TABLE_FORMULA@6..19
         HASH_PLUS@6..8 "#+"
         TEXT@8..13 "tblfm"
         COLON@13..14 ":"
@@ -228,13 +228,13 @@ r#"|
         WHITESPACE@3..4 " "
         PIPE@4..5 "|"
         WHITESPACE@5..6 "\n"
-      KEYWORD@6..21
+      TABLE_FORMULA@6..21
         HASH_PLUS@6..8 "#+"
         TEXT@8..13 "TBLFM"
         COLON@13..14 ":"
         TEXT@14..20 " test1"
         NEW_LINE@20..21 "\n"
-      KEYWORD@21..35
+      TABLE_FORMULA@21..35
         HASH_PLUS@21..23 "#+"
         TEXT@23..28 "TBLFM"
         COLON@28..29 ":"

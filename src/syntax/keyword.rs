@@ -12,6 +12,7 @@ use nom::{
 use super::{
     combinator::{blank_lines, hash_plus_token, node, trim_line_end, GreenElement},
     input::Input,
+    object::standard_object_nodes,
     SyntaxKind,
 };
 
@@ -88,10 +89,17 @@ pub fn tblfm_keyword_nodes(input: Input) -> IResult<Input, Vec<GreenElement>, ()
 
         debug_assert!(i.len() > input.len(), "{} > {}", i.len(), input.len());
         i = input;
-        children.push(node(SyntaxKind::KEYWORD, nodes));
+        children.push(node(SyntaxKind::TABLE_FORMULA, nodes));
     }
 
     Ok((i, children))
+}
+
+/// Keywords whose value is text, so it is parsed for markup.
+fn has_object_value(key: &str) -> bool {
+    ["TITLE", "SUBTITLE", "AUTHOR", "DATE", "CAPTION"]
+        .iter()
+        .any(|k| key.eq_ignore_ascii_case(k))
 }
 
 fn keyword_node_base(input: Input) -> IResult<Input, (&str, Vec<GreenElement>), ()> {
@@ -113,7 +121,18 @@ fn keyword_node_base(input: Input) -> IResult<Input, (&str, Vec<GreenElement>), 
         children.push(r_bracket.token(SyntaxKind::R_BRACKET));
     }
     children.push(colon.token(SyntaxKind::COLON));
-    children.push(value.text_token());
+    if has_object_value(key.s) && !value.trim_start().is_empty() {
+        let (rest, lead) = value.take_split(value.len() - value.trim_start().len());
+        if !lead.is_empty() {
+            children.push(lead.ws_token());
+        }
+        children.push(node(
+            SyntaxKind::KEYWORD_VALUE,
+            standard_object_nodes(rest),
+        ));
+    } else {
+        children.push(value.text_token());
+    }
     if !ws_.is_empty() {
         children.push(ws_.ws_token());
     }
@@ -265,7 +284,9 @@ fn parse() {
       HASH_PLUS@0..2 "#+"
       TEXT@2..9 "CAPTION"
       COLON@9..10 ":"
-      TEXT@10..16 " value"
+      WHITESPACE@10..11 " "
+      KEYWORD_VALUE@11..16
+        TEXT@11..16 "value"
     "###
     );
 
@@ -279,7 +300,9 @@ fn parse() {
       TEXT@10..26 "caption optional"
       R_BRACKET@26..27 "]"
       COLON@27..28 ":"
-      TEXT@28..34 " value"
+      WHITESPACE@28..29 " "
+      KEYWORD_VALUE@29..34
+        TEXT@29..34 "value"
     "###
     );
 
