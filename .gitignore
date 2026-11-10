@@ -1,2 +1,5 @@
 /target
 /dist
+
+# insta writes these on every test run
+*.pending-snap
