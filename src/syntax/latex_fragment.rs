@@ -113,9 +113,9 @@ fn template5(input: Input) -> IResult<Input, GreenElement, ()> {
         return Err(nom::Err::Error(()));
     }
 
-    let p = input.bytes().next();
-    if let Some(p) = p {
-        if !matches!(p, b')' | b'}' | b']' | b'\'' | b'"' | b' ' | b'\r' | b'\n') {
+    // POST: end of input, or any character that is not ASCII alphanumeric
+    if let Some(p) = input.bytes().next() {
+        if p.is_ascii_alphanumeric() {
             return Err(nom::Err::Error(()));
         }
     }
@@ -196,4 +196,30 @@ fn parse() {
     assert!(latex_fragment_node(("$a$a", &c).into()).is_err());
     assert!(latex_fragment_node(("$$b\nol\nd*", &c).into()).is_err());
     assert!(latex_fragment_node(("$b\nol\nd*", &c).into()).is_err());
+}
+
+#[test]
+fn dollar_fragment_post_is_not_alphanumeric() {
+    use rowan::ast::AstNode;
+
+    use crate::ast::LatexFragment;
+
+    let fragments = |input: &str| -> Vec<String> {
+        let org = crate::Org::parse(input);
+        let doc = org.document();
+        doc.syntax()
+            .descendants()
+            .filter_map(LatexFragment::cast)
+            .map(|f| f.raw())
+            .collect()
+    };
+
+    assert_eq!(
+        fragments("area $i$, with $v_i$. And $x$ here.\n"),
+        ["$i$", "$v_i$", "$x$"]
+    );
+    assert_eq!(fragments("($a+b$)\n"), ["$a+b$"]);
+    assert_eq!(fragments("costs $5 and $10 more\n"), Vec::<String>::new());
+    assert_eq!(fragments("a$b$c\n"), Vec::<String>::new());
+    assert_eq!(fragments("$x$\n"), ["$x$"]);
 }
