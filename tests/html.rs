@@ -219,4 +219,23 @@ fn round_trip_blank_lines_after_headline() {
     for s in inputs {
         assert_eq!(Org::parse(s).to_org(), s, "input: {s:?}");
     }
+
+fn table_caption() {
+    let html = Org::parse("#+NAME: t\n#+CAPTION: cap\n| a | b |\n|---+---|\n| 1 | 2 |\n").to_html();
+    assert!(html.contains("<table>"), "{html}");
+    assert!(html.contains("<caption>cap</caption>"), "{html}");
+    assert!(!html.contains("<p>|"), "{html}");
+}
+
+#[test]
+fn table_empty_cell_keeps_columns() {
+    let html = Org::parse("| column 1 | column 2 |\n|          | column 2 |\n").to_html();
+    assert!(
+        html.contains("<tr><td>column 1</td><td>column 2</td></tr>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<tr><td></td><td>column 2</td></tr>"),
+        "{html}"
+    );
 }

@@ -1,7 +1,6 @@
 use nom::{
     bytes::complete::take_while,
     character::complete::{multispace0, space0},
-    combinator::iterator,
     sequence::tuple,
     Err, IResult, InputTake, Slice,
 };
@@ -9,13 +8,15 @@ use nom::{
 use super::{
     combinator::{blank_lines, line_ends_iter, node, pipe_token, GreenElement, NodeBuilder},
     input::Input,
-    keyword::tblfm_keyword_nodes,
+    keyword::{affiliated_keyword_nodes, tblfm_keyword_nodes},
     object::standard_object_nodes,
     SyntaxKind::*,
 };
 
 fn org_table_node_base(input: Input) -> IResult<Input, GreenElement, ()> {
-    let mut children = vec![];
+    let (input, affiliated_keywords) = affiliated_keyword_nodes(input)?;
+
+    let mut children = affiliated_keywords;
 
     let mut start = 0;
     for i in line_ends_iter(input.as_str()) {
@@ -59,36 +60,42 @@ fn table_standard_row_node(input: Input) -> Result<GreenElement, nom::Err<()>> {
 
     b.ws(ws);
 
-    let mut it = iterator(
-        input,
-        tuple((pipe_token, multispace0, take_while(|c: char| c != '|'))),
-    );
-
-    it.for_each(|(pipe, ws, input)| {
+    let mut rest = input;
+    while let Ok((next, (pipe, ws, cell))) = tuple((
+        pipe_token,
+        multispace0,
+        take_while(|c: char| c != '|'),
+    ))(rest)
+    {
+        rest = next;
         b.push(pipe);
         b.ws(ws);
 
-        if input.is_empty() {
-            return;
+        if cell.is_empty() {
+            // An empty cell still counts when another pipe follows it on this row.
+            // Nothing after the final pipe means no cell.
+            if rest.as_str().starts_with('|') {
+                b.push(node(ORG_TABLE_CELL, vec![]));
+            }
+            continue;
         }
 
-        match input
+        match cell
             .as_bytes()
             .iter()
             .rposition(|b| !b.is_ascii_whitespace())
         {
             Some(idx) => {
-                let (ws, cell) = input.take_split(idx + 1);
+                let (ws, cell) = cell.take_split(idx + 1);
                 b.push(node(ORG_TABLE_CELL, standard_object_nodes(cell)));
                 b.ws(ws);
             }
             _ => {
-                b.push(node(ORG_TABLE_CELL, standard_object_nodes(input)));
+                b.push(node(ORG_TABLE_CELL, standard_object_nodes(cell)));
             }
         }
-    });
-    let (input, _) = it.finish()?;
-    debug_assert!(input.is_empty());
+    }
+    debug_assert!(rest.is_empty());
 
     Ok(b.finish(ORG_TABLE_STANDARD_ROW))
 }
@@ -262,4 +269,34 @@ fn parse_table_el() {
 
     assert!(table_el_node(("", config).into()).is_err());
     assert!(table_el_node(("+----|---", config).into()).is_err());
+}
+
+#[test]
+fn empty_cell_keeps_column_count() {
+    use rowan::ast::AstNode;
+
+    use crate::{
+        ast::{OrgTable, OrgTableCell, OrgTableRow},
+        tests::to_ast,
+        Org,
+    };
+
+    let s = "| column 1 | column 2 |\n|          | column 2 |\n";
+    let table = to_ast::<OrgTable>(org_table_node)(s);
+    let cells_per_row = table
+        .syntax()
+        .children()
+        .filter_map(OrgTableRow::cast)
+        .map(|row| row.syntax().children().filter_map(OrgTableCell::cast).count())
+        .collect::<Vec<_>>();
+    assert_eq!(cells_per_row, vec![2, 2]);
+    assert_eq!(Org::parse(s).to_org(), s);
+}
+
+#[test]
+fn table_with_affiliated_keywords_is_lossless() {
+    use crate::Org;
+
+    let s = "#+NAME: t\n#+CAPTION: cap\n| a | b |\n|---+---|\n| 1 | 2 |\n";
+    assert_eq!(Org::parse(s).to_org(), s);
 }
