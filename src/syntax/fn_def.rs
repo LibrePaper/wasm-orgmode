@@ -2,19 +2,97 @@ use nom::{
     bytes::complete::{tag, take_while1},
     combinator::map,
     sequence::tuple,
-    IResult,
+    IResult, Slice,
 };
 
 use super::{
     combinator::{
-        blank_lines, colon_token, l_bracket_token, node, r_bracket_token, trim_line_end,
+        blank_lines, colon_token, l_bracket_token, line_ends_iter, node, r_bracket_token,
         GreenElement, NodeBuilder,
     },
+    element::element_nodes,
     input::Input,
     keyword::affiliated_keyword_nodes,
     object::standard_object_nodes,
     SyntaxKind::*,
 };
+
+/// Whether a line starts another footnote definition.
+fn starts_fn_def(line: &str) -> bool {
+    let Some(rest) = line.strip_prefix("[fn:") else {
+        return false;
+    };
+    let label = rest
+        .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+        .unwrap_or(rest.len());
+    label > 0 && rest[label..].starts_with(']')
+}
+
+/// Whether a line is a headline: stars at column 0 and a space.
+fn starts_headline(line: &str) -> bool {
+    let stars = line.bytes().take_while(|&b| b == b'*').count();
+    stars > 0 && matches!(line.as_bytes().get(stars), Some(b' ' | b'\t'))
+}
+
+/// Whether the text has a blank line between two lines with text.
+fn has_inner_blank_line(content: &str) -> bool {
+    let mut seen_text = false;
+    let mut seen_blank = false;
+    for line in content.split_inclusive(['\n', '\r']) {
+        if line.trim().is_empty() {
+            seen_blank |= seen_text;
+        } else if seen_blank {
+            return true;
+        } else {
+            seen_text = true;
+        }
+    }
+    false
+}
+
+/// The text of a definition after its label: the rest of the line and every line
+/// after it up to the next definition, a headline, or two blank lines in a row.
+/// Returns the content, its trailing blanks and its line end.
+fn fn_def_body(input: Input) -> IResult<Input, (Input, Input, Input), ()> {
+    let s = input.as_str();
+    let mut end = 0;
+    let mut start = 0;
+    let mut blanks = 0;
+    for (n, line_end) in line_ends_iter(s).enumerate() {
+        if start == line_end {
+            break;
+        }
+        let line = &s[start..line_end];
+        if n > 0 {
+            if line.trim().is_empty() {
+                blanks += 1;
+                if blanks == 2 {
+                    break;
+                }
+                start = line_end;
+                continue;
+            }
+            if starts_fn_def(line) || starts_headline(line) {
+                break;
+            }
+        }
+        blanks = 0;
+        end = line_end;
+        start = line_end;
+    }
+
+    let text = &s[..end];
+    let trimmed = text.trim_end_matches(|c: char| c.is_ascii_whitespace()).len();
+    let nl_at = trimmed + text[trimmed..].find(['\n', '\r']).unwrap_or(end - trimmed);
+    Ok((
+        input.slice(end..),
+        (
+            input.slice(..trimmed),
+            input.slice(trimmed..nl_at),
+            input.slice(nl_at..end),
+        ),
+    ))
+}
 
 #[cfg_attr(
   feature = "tracing",
@@ -33,7 +111,7 @@ fn fn_def_node_base(input: Input) -> IResult<Input, GreenElement, ()> {
             colon_token,
             take_while1(|c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_'),
             r_bracket_token,
-            trim_line_end,
+            fn_def_body,
             blank_lines,
         )),
         |(
@@ -55,7 +133,14 @@ fn fn_def_node_base(input: Input) -> IResult<Input, GreenElement, ()> {
             b.push(label.token(FN_LABEL));
             b.push(r_bracket);
 
-            let content_node = node(FN_CONTENT, standard_object_nodes(content));
+            // A definition of one paragraph holds its objects; one with a blank
+            // line inside holds elements.
+            let content_node = if has_inner_blank_line(content.as_str()) {
+                let children = element_nodes(content).unwrap_or_else(|_| vec![content.text_token()]);
+                node(FN_CONTENT, children)
+            } else {
+                node(FN_CONTENT, standard_object_nodes(content))
+            };
             b.push(content_node);
 
             b.ws(ws_);
@@ -183,4 +268,47 @@ fn parse() {
           LINK_PATH@26..45 "https://orgmode.org"
     "##
     );
+}
+
+#[test]
+fn multiline_definitions() {
+    use crate::tests::to_ast;
+    use crate::ast::FnDef;
+    use rowan::ast::AstNode;
+
+    let to_fn_def = to_ast::<FnDef>(fn_def_node);
+    let content = |s: &str| {
+        let def = to_fn_def(s);
+        assert_eq!(def.syntax().to_string(), s, "lossless");
+        def.syntax()
+            .children()
+            .find(|n| n.kind() == FN_CONTENT)
+            .unwrap()
+            .to_string()
+    };
+
+    // continuation lines belong to the definition
+    assert_eq!(content("[fn:1] one\ntwo\nthree\n"), " one\ntwo\nthree");
+    // one blank line does not end it, and the content holds elements
+    let def = to_fn_def("[fn:1] one\n\ntwo\n");
+    let content = def.syntax().children().find(|n| n.kind() == FN_CONTENT).unwrap();
+    assert_eq!(content.to_string(), " one\n\ntwo");
+    assert!(content.children().all(|n| n.kind() == PARAGRAPH), "{content:#?}");
+}
+
+#[test]
+fn definition_extents() {
+    let config = crate::ParseConfig::default();
+    let rest = |s: &str| {
+        fn_def_node((s, &config).into())
+            .unwrap()
+            .0
+            .as_str()
+            .to_string()
+    };
+    assert_eq!(rest("[fn:1] one\n[fn:2] two\n"), "[fn:2] two\n");
+    assert_eq!(rest("[fn:1] one\ntwo\n* Head\nbody\n"), "* Head\nbody\n");
+    assert_eq!(rest("[fn:1] one\n\n[fn:2] two\n"), "[fn:2] two\n");
+    assert_eq!(rest("[fn:1] one\n\n\nafter\n"), "after\n");
+    assert_eq!(rest("[fn:1] one\n\nmore\n\n\nafter\n"), "after\n");
 }

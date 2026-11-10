@@ -751,3 +751,25 @@ mod tests {
         assert!(!render_body("Hello.\n").contains("<main>"));
     }
 }
+
+#[cfg(test)]
+mod footnote_tests {
+    use super::render_body;
+
+    #[test]
+    fn a_footnote_definition_spans_lines_until_a_definition_or_two_blank_lines() {
+        let out = render_body(
+            "A[fn:a] and B[fn:b].\n\n[fn:a] First line\nsecond line\n\nthird after one blank.\n[fn:b] Other.\n\n\nOutside.\n",
+        );
+        let notes = out.find("class=\"footnotes\"").expect("notes");
+        let one = out.find("<li id=\"fn-1\">").expect("note 1");
+        let two = out.find("<li id=\"fn-2\">").expect("note 2");
+        assert!(notes < one && one < two, "{out}");
+        assert!(out[one..two].contains("First line\nsecond line"), "{out}");
+        assert!(out[one..two].contains("third after one blank."), "{out}");
+        assert!(out[two..].contains("Other."), "{out}");
+        // the text after two blank lines is body text, before the notes
+        assert!(out[..notes].contains("Outside."), "{out}");
+        assert!(!out[two..].contains("Outside."), "{out}");
+    }
+}
