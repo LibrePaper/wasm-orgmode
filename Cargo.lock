@@ -341,12 +341,12 @@ checksum = "402bb19d8e03f1d1a7450e2bd613980869438e0666331be3e073089124aa1adc"
 
 [[package]]
 name = "wasm-helpers"
-version = "0.1.0"
-source = "git+https://github.com/LibrePaper/wasm-helpers?tag=v0.1.1#29aeedcca6f8b407bab06952c6ea939e02a1b334"
+version = "0.3.3"
+source = "git+https://github.com/LibrePaper/wasm-helpers?tag=v0.3.3#5fcbca871980139441b77a0d4588917897bf13c6"
 
 [[package]]
 name = "wasm-orgmode"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "bytecount",
  "cfg-if",
