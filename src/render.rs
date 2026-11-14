@@ -16,8 +16,8 @@ use std::cmp::min;
 
 use rowan::ast::AstNode;
 
-use crate::ast::{Citation, Clock, Document, Paragraph, Planning, Timestamp};
-use crate::export::{Container, Event, HtmlExport, TraversalContext, Traverser};
+use crate::ast::{AffiliatedKeyword, Citation, Clock, Document, Link, Paragraph, Planning, Timestamp};
+use crate::export::{Container, Event, HtmlEscape, HtmlExport, TraversalContext, Traverser};
 use crate::page;
 use crate::{Org, SyntaxElement, SyntaxKind, SyntaxNode};
 
@@ -329,6 +329,156 @@ fn has_text(reference: &SyntaxNode) -> bool {
         .any(|child| child.kind() == SyntaxKind::FN_CONTENT)
 }
 
+/// A paragraph that is a figure: an image link, with the affiliated keywords
+/// that describe it.
+struct Figure {
+    /// The link's path, with a leading `file:` taken off.
+    path: String,
+    caption: Option<String>,
+    name: Option<String>,
+    alt: Option<String>,
+    /// The width, as a CSS length.
+    width: Option<String>,
+    /// The height, as a CSS length.
+    height: Option<String>,
+}
+
+impl Figure {
+    /// Whether the keywords say anything about the figure. A bare image with
+    /// none is written as an ordinary paragraph.
+    fn is_marked(&self) -> bool {
+        self.caption.is_some()
+            || self.name.is_some()
+            || self.alt.is_some()
+            || self.width.is_some()
+            || self.height.is_some()
+    }
+}
+
+/// The figure a paragraph is, if it is one. Apart from its affiliated keywords
+/// and line breaks, a figure holds exactly one image link and nothing else.
+fn figure_of(paragraph: &Paragraph) -> Option<Figure> {
+    let mut links = Vec::new();
+    for child in paragraph.syntax().children_with_tokens() {
+        match child {
+            SyntaxElement::Token(token)
+                if matches!(
+                    token.kind(),
+                    SyntaxKind::WHITESPACE | SyntaxKind::NEW_LINE | SyntaxKind::BLANK_LINE
+                ) => {}
+            SyntaxElement::Node(node) if node.kind() == SyntaxKind::AFFILIATED_KEYWORD => {}
+            SyntaxElement::Node(node) if node.kind() == SyntaxKind::LINK => links.push(node),
+            _ => return None,
+        }
+    }
+    let link = Link::cast(links.pop()?)?;
+    if !links.is_empty() || !link.is_image() {
+        return None;
+    }
+
+    // Keywords are matched without regard to case, as Org matches them. The
+    // generated accessors compare with upper-case names only.
+    let keywords: Vec<AffiliatedKeyword> = paragraph
+        .syntax()
+        .children()
+        .filter_map(AffiliatedKeyword::cast)
+        .collect();
+    let keyword = |key: &str| {
+        keywords
+            .iter()
+            .find(|k| k.key().eq_ignore_ascii_case(key))
+            .and_then(|k| k.value())
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+    };
+    let attr = |backend: &str, key: &str| {
+        keywords
+            .iter()
+            .filter(|k| k.key().eq_ignore_ascii_case(backend))
+            .filter_map(|k| k.value())
+            .find_map(|line| plist_value(&line, key))
+    };
+    // A size that is not safe to write is ignored, so the next source in the
+    // precedence order is tried.
+    let size = |backend: &str, key: &str| attr(backend, key).and_then(|raw| css_length(&raw));
+
+    let path = link.path();
+    Some(Figure {
+        path: path.trim_start_matches("file:").to_string(),
+        caption: keyword("CAPTION"),
+        name: keyword("NAME"),
+        alt: attr("ATTR_HTML", "alt"),
+        width: size("ATTR_HTML", "width")
+            .or_else(|| size("ATTR_ORG", "width"))
+            .or_else(|| size("ATTR_LATEX", "width")),
+        height: size("ATTR_HTML", "height"),
+    })
+}
+
+/// The value of one property in an attribute line, which is a plist: `:width
+/// 300px :alt A plot` gives `300px` for `width`. A value runs to the next word
+/// that starts with a colon, and an empty value is nothing.
+fn plist_value(line: &str, key: &str) -> Option<String> {
+    let mut words = line.split_whitespace().peekable();
+    while let Some(word) = words.next() {
+        if word
+            .strip_prefix(':')
+            .is_some_and(|name| name.eq_ignore_ascii_case(key))
+        {
+            let mut value = Vec::new();
+            while let Some(part) = words.next_if(|part| !part.starts_with(':')) {
+                value.push(part);
+            }
+            return (!value.is_empty()).then(|| value.join(" "));
+        }
+    }
+    None
+}
+
+/// The CSS length a figure size is written as, or nothing if the size is not
+/// one that is safe to write. A bare number is in pixels, a number with a CSS
+/// unit keeps it, and a LaTeX fraction of the line becomes a percentage. Only
+/// digits, one dot and a known unit get through, so nothing else can reach a
+/// style attribute.
+fn css_length(raw: &str) -> Option<String> {
+    let raw = raw.trim().to_ascii_lowercase();
+    for line in ["\\textwidth", "\\linewidth", "\\columnwidth"] {
+        if let Some(fraction) = raw.strip_suffix(line) {
+            let fraction = if fraction.is_empty() { "1" } else { fraction };
+            if !is_number(fraction) {
+                return None;
+            }
+            let percent = fraction.parse::<f64>().ok()? * 100.0;
+            // Six places, then the trailing zeros and dot are dropped.
+            let text = format!("{percent:.6}");
+            return Some(format!("{}%", text.trim_end_matches('0').trim_end_matches('.')));
+        }
+    }
+    let split = raw
+        .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .unwrap_or(raw.len());
+    let (number, unit) = raw.split_at(split);
+    if !is_number(number) {
+        return None;
+    }
+    match unit {
+        "" => Some(format!("{number}px")),
+        "px" | "em" | "rem" | "%" | "cm" | "mm" | "in" | "pt" | "pc" | "ex" | "ch" | "vw"
+        | "vh" => Some(format!("{number}{unit}")),
+        _ => None,
+    }
+}
+
+/// Whether a string is a plain decimal: at least one digit and at most one dot,
+/// and the dot, if there is one, is not the last character.
+fn is_number(s: &str) -> bool {
+    !s.is_empty()
+        && s.bytes().any(|b| b.is_ascii_digit())
+        && s.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+        && s.matches('.').count() <= 1
+        && !s.ends_with('.')
+}
+
 /// Splits a raw LaTeX fragment into its display style and its TeX, with the
 /// delimiters taken off. A fragment that matches none of the delimiter pairs
 /// is kept whole and set inline.
@@ -528,6 +678,45 @@ impl Render {
             None => self.html.push_str(page::escape(text)),
         }
     }
+
+    /// A figure: its image in a `<figure>` with the caption and the name as its
+    /// id, or in a plain `<p>` when it has neither.
+    fn figure(&mut self, figure: &Figure, ctx: &mut TraversalContext) {
+        let wrapped = figure.caption.is_some() || figure.name.is_some();
+        if !wrapped {
+            self.html.push_str("<p>");
+        } else if let Some(name) = &figure.name {
+            self.html.push_str(format!(
+                "<figure class=\"figure\" id=\"{}\">",
+                page::escape(name)
+            ));
+        } else {
+            self.html.push_str("<figure class=\"figure\">");
+        }
+
+        let mut image = format!("<img src=\"{}\"", HtmlEscape(&figure.path));
+        if let Some(alt) = &figure.alt {
+            image.push_str(&format!(" alt=\"{}\"", page::escape(alt)));
+        }
+        let style: Vec<String> = figure
+            .width
+            .iter()
+            .map(|width| format!("width:{width}"))
+            .chain(figure.height.iter().map(|height| format!("height:{height}")))
+            .collect();
+        if !style.is_empty() {
+            image.push_str(&format!(" style=\"{}\"", style.join(";")));
+        }
+        image.push('>');
+        self.html.push_str(image);
+
+        if let Some(caption) = &figure.caption {
+            self.html.push_str("<figcaption>");
+            self.inline_org(caption, ctx);
+            self.html.push_str("</figcaption>");
+        }
+        self.html.push_str(if wrapped { "</figure>" } else { "</p>" });
+    }
 }
 
 impl Traverser for Render {
@@ -567,6 +756,18 @@ impl Traverser for Render {
                     self.html.push_str("</caption>");
                 }
             }
+
+            // An image paragraph with a caption, a name or a size is a figure. It
+            // is written here and its children are skipped, so they are not walked
+            // again. Any other paragraph, including a bare image, is left to the
+            // exporter exactly as before.
+            Event::Enter(Container::Paragraph(paragraph)) => match figure_of(&paragraph) {
+                Some(figure) if figure.is_marked() => {
+                    self.figure(&figure, ctx);
+                    ctx.skip();
+                }
+                _ => self.html.event(Event::Enter(Container::Paragraph(paragraph)), ctx),
+            },
 
             Event::Enter(Container::FnRef(reference)) => {
                 let label = reference
@@ -976,6 +1177,145 @@ mod tests {
     fn an_unknown_checkbox_state_is_plain_text() {
         let out = render_body("- [?] x\n");
         assert!(!out.contains("class=\"task"), "{out}");
+    }
+
+    #[test]
+    fn a_captioned_named_figure_is_a_figure_element() {
+        let out = render_body(
+            "#+CAPTION: Outcome by *exposure*\n#+NAME: fig:one\n#+ATTR_HTML: :width 300px\n[[file:plot.png]]\n",
+        );
+        assert!(
+            out.contains(
+                "<figure class=\"figure\" id=\"fig:one\"><img src=\"plot.png\" style=\"width:300px\"><figcaption>"
+            ),
+            "{out}"
+        );
+        assert!(out.contains("<b>exposure</b>"), "{out}");
+        assert!(out.contains("</figcaption></figure>"), "{out}");
+    }
+
+    #[test]
+    fn lower_case_figure_keywords_work_the_same() {
+        let out = render_body(
+            "#+caption: Outcome by *exposure*\n#+name: fig:one\n#+attr_html: :width 300px\n[[file:plot.png]]\n",
+        );
+        assert!(
+            out.contains(
+                "<figure class=\"figure\" id=\"fig:one\"><img src=\"plot.png\" style=\"width:300px\"><figcaption>"
+            ),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn a_sized_figure_without_caption_or_name_is_a_plain_paragraph() {
+        let out = render_body("#+ATTR_HTML: :width 50%\n[[file:plot.png]]\n");
+        assert!(
+            out.contains("<p><img src=\"plot.png\" style=\"width:50%\"></p>"),
+            "{out}"
+        );
+        assert!(!out.contains("<figure"), "{out}");
+    }
+
+    #[test]
+    fn the_width_comes_from_html_then_org_then_latex() {
+        let latex = render_body("#+ATTR_LATEX: :width 0.5\\textwidth\n[[file:plot.png]]\n");
+        assert!(latex.contains("style=\"width:50%\""), "{latex}");
+
+        let org = render_body("#+ATTR_ORG: :width 300\n[[file:plot.png]]\n");
+        assert!(org.contains("style=\"width:300px\""), "{org}");
+
+        let all = render_body(
+            "#+ATTR_LATEX: :width 0.5\\textwidth\n#+ATTR_ORG: :width 300\n#+ATTR_HTML: :width 200px\n[[file:plot.png]]\n",
+        );
+        assert!(all.contains("style=\"width:200px\""), "{all}");
+        assert!(!all.contains("50%"), "{all}");
+        assert!(!all.contains("300px"), "{all}");
+    }
+
+    #[test]
+    fn alt_text_is_escaped_and_height_is_written() {
+        let out = render_body(
+            "#+ATTR_HTML: :alt A <plot> & \"x\" :height 2in\n[[file:plot.png]]\n",
+        );
+        assert!(out.contains("alt=\"A &lt;plot&gt;"), "{out}");
+        assert!(!out.contains("<plot>"), "{out}");
+        assert!(out.contains("style=\"height:2in\""), "{out}");
+    }
+
+    #[test]
+    fn an_unsafe_size_writes_no_style() {
+        for source in [
+            "#+ATTR_HTML: :width 100px;background:url(x)\n[[file:plot.png]]\n",
+            "#+ATTR_HTML: :width expression(1)\n[[file:plot.png]]\n",
+        ] {
+            let out = render_body(source);
+            assert!(!out.contains("style="), "{out}");
+            assert!(!out.contains("background"), "{out}");
+            assert!(!out.contains("expression"), "{out}");
+            assert!(out.contains("<img src=\"plot.png\">"), "{out}");
+        }
+    }
+
+    #[test]
+    fn an_image_in_running_text_or_with_no_keywords_renders_as_before() {
+        let plain = render_body("[[file:plot.png]]\n");
+        assert!(plain.starts_with("<p><img src=\"plot.png\">"), "{plain}");
+        assert!(!plain.contains("<figure"), "{plain}");
+        assert!(!plain.contains("style="), "{plain}");
+
+        let inline = render_body("See [[file:plot.png]] here.\n");
+        assert!(inline.contains("<p>See <img src=\"plot.png\"> here."), "{inline}");
+        assert!(!inline.contains("style="), "{inline}");
+        assert!(!inline.contains("<figure"), "{inline}");
+    }
+
+    #[test]
+    fn a_css_length_is_written_only_when_it_is_safe() {
+        for (raw, want) in [
+            ("300", "300px"),
+            ("12.5", "12.5px"),
+            (".5", ".5px"),
+            ("2in", "2in"),
+            ("1.5EM", "1.5em"),
+            ("50%", "50%"),
+            ("0.5\\textwidth", "50%"),
+            ("\\textwidth", "100%"),
+            (".8\\linewidth", "80%"),
+            ("1.0\\columnwidth", "100%"),
+        ] {
+            assert_eq!(css_length(raw).as_deref(), Some(want), "{raw}");
+        }
+        for raw in [
+            "",
+            ".",
+            "-3px",
+            "1e3px",
+            "100px;background:url(x)",
+            "expression(1)",
+            "calc(1px)",
+            "300 px",
+            "10.px",
+            "1.2.3px",
+            "3pz",
+            "300px\\textwidth",
+        ] {
+            assert_eq!(css_length(raw), None, "{raw}");
+        }
+    }
+
+    #[test]
+    fn a_figure_image_with_a_style_is_still_pointed_at_its_asset() {
+        let assets = |path: &str| (path == "plot.png").then(|| "/assets/plot.png".to_string());
+        let out = render_with(
+            "#+CAPTION: Cap\n#+ATTR_HTML: :width 300px\n[[file:plot.png]]\n",
+            "t",
+            &assets,
+        );
+        assert!(
+            out.contains("<img src=\"/assets/plot.png\" style=\"width:300px\">"),
+            "{out}"
+        );
     }
 }
 
