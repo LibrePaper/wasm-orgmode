@@ -1,7 +1,7 @@
 # The Org-mode renderer, as a WebAssembly module.
 [package]
 name = "wasm-orgmode"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 license = "MIT"
 # Never goes to crates.io: the renderers are consumed by git tag.
@@ -28,7 +28,7 @@ syntax-org-fc = []
 [dependencies]
 # The shared page template, diagnostics and WebAssembly interface, pinned to
 # a tag.
-wasm-helpers = { git = "https://github.com/LibrePaper/wasm-helpers", tag = "v0.3.3" }
+wasm-helpers = { git = "https://github.com/LibrePaper/wasm-helpers", tag = "v0.4.0" }
 bytecount = "0.6"
 cfg-if = "1.0.0"
 # Without its default features, so nothing reads a clock the module lacks.
