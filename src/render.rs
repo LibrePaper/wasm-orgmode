@@ -2,8 +2,10 @@
 //!
 //! The HTML exporter in `crate::export` does most of the work. This module
 //! takes over the few places a LibrePaper document needs more: headlines show
-//! their TODO keyword, priority and planning; math is carried as TeX for the host to typeset; and the
-//! figures a document names are pointed at what the host says is there.
+//! their TODO keyword, priority and planning; math is carried as TeX for the
+//! host to typeset; the figures a document names are pointed at what the host
+//! says is there; and the title, subtitle, author and date keywords open the
+//! page as a title block.
 //!
 //! Rendering at publish time rather than per request keeps one thing true that
 //! everything else depends on: a document is HTML, addressed by the hash of the
@@ -14,7 +16,7 @@ use std::cmp::min;
 
 use rowan::ast::AstNode;
 
-use crate::ast::{Citation, Clock, Paragraph, Planning, Timestamp};
+use crate::ast::{Citation, Clock, Document, Paragraph, Planning, Timestamp};
 use crate::export::{Container, Event, HtmlExport, TraversalContext, Traverser};
 use crate::page;
 use crate::{Org, SyntaxElement, SyntaxKind, SyntaxNode};
@@ -451,6 +453,67 @@ impl Render {
         self.html.push_str("</ol></section>");
     }
 
+    /// The title block is the document's `#+TITLE:`, `#+SUBTITLE:`, `#+AUTHOR:`
+    /// and `#+DATE:` keywords as the header that opens the page, with the
+    /// classes the house stylesheet already styles for Quarto title blocks. A
+    /// repeated keyword is joined with a space, as Org joins it. Nothing is
+    /// written when none of them is set.
+    fn title_block(&mut self, document: &Document, ctx: &mut TraversalContext) {
+        const PARTS: [(&str, &str, &str); 4] = [
+            ("TITLE", "h1", "title"),
+            ("SUBTITLE", "p", "subtitle"),
+            ("AUTHOR", "p", "author"),
+            ("DATE", "p", "date"),
+        ];
+        let blank = |element: &SyntaxElement| {
+            element
+                .as_token()
+                .is_some_and(|token| token.text().trim().is_empty())
+        };
+
+        let mark = self.html.len();
+        self.html.push_str("<header class=\"title-block\">");
+        let opened = self.html.len();
+        for (key, tag, class) in PARTS {
+            let values: Vec<SyntaxNode> = document
+                .keywords()
+                .filter(|kw| kw.key().eq_ignore_ascii_case(key))
+                .filter_map(|kw| {
+                    kw.syntax()
+                        .children()
+                        .find(|n| n.kind() == SyntaxKind::KEYWORD_VALUE)
+                })
+                .filter(|value| !value.text().to_string().trim().is_empty())
+                .collect();
+            if values.is_empty() {
+                continue;
+            }
+            self.html.push_str(format!("<{tag} class=\"{class}\">"));
+            for (i, value) in values.iter().enumerate() {
+                if i > 0 {
+                    self.html.push_str(" ");
+                }
+                // The value's leading whitespace is not part of its text.
+                let children: Vec<SyntaxElement> = value.children_with_tokens().collect();
+                let skip = children.iter().take_while(|element| blank(element)).count();
+                for (j, child) in children.into_iter().skip(skip).enumerate() {
+                    match child.as_token() {
+                        Some(token) if j == 0 && token.text().starts_with(char::is_whitespace) => {
+                            self.html.push_str(page::escape(token.text().trim_start()));
+                        }
+                        _ => self.element(child, ctx),
+                    }
+                }
+            }
+            self.html.push_str(format!("</{tag}>"));
+        }
+        if self.html.len() == opened {
+            self.html.split_off(mark);
+            return;
+        }
+        self.html.push_str("</header>");
+    }
+
     /// A caption's text as inline Org, rendered through this traverser so that
     /// math and markup in it come out as they do in the body. Text that does
     /// not parse as a paragraph is written escaped.
@@ -570,8 +633,9 @@ impl Traverser for Render {
             Event::Clock(clock) => self.clock(&clock),
 
             // The page template supplies the `<body>`, so a document adds no
-            // wrapper of its own. Its footnotes come last.
-            Event::Enter(Container::Document(_)) => {}
+            // wrapper of its own. Its title block comes first and its footnotes
+            // last.
+            Event::Enter(Container::Document(document)) => self.title_block(&document, ctx),
             Event::Leave(Container::Document(_)) => self.footnotes(),
 
             // A LOGBOOK drawer is the one drawer whose clock entries are shown.
@@ -612,6 +676,59 @@ mod tests {
         let out = render_body("Hello.\n");
         assert!(out.contains("<p>Hello."), "{out}");
         assert!(!out.contains("data-source"), "{out}");
+    }
+
+    #[test]
+    fn the_title_keywords_open_the_page_as_a_title_block() {
+        let out = render_body(
+            "#+TITLE: Learn *LibrePaper* with Org\n#+AUTHOR: LibrePaper\n#+bibliography: references.bib\n\nBody text.\n",
+        );
+        assert!(out.starts_with("<header class=\"title-block\">"), "{out}");
+        assert!(
+            out.contains("<h1 class=\"title\">Learn <b>LibrePaper</b> with Org</h1>"),
+            "{out}"
+        );
+        assert!(out.contains("<p class=\"author\">LibrePaper</p>"), "{out}");
+        assert!(out.contains("</header>"), "{out}");
+        assert!(!out.contains("references.bib"), "{out}");
+        let close = out.find("</header>").expect("a closed header");
+        let body = out.find("Body text.").expect("the body");
+        assert!(close < body, "{out}");
+    }
+
+    #[test]
+    fn a_subtitle_and_a_date_join_the_title_block() {
+        let out = render_body("#+TITLE: T\n#+SUBTITLE: S\n#+DATE: 2026-11-13\n");
+        assert!(out.contains("<p class=\"subtitle\">S</p>"), "{out}");
+        assert!(out.contains("<p class=\"date\">2026-11-13</p>"), "{out}");
+        let title = out.find("class=\"title\"").expect("a title");
+        let subtitle = out.find("class=\"subtitle\"").expect("a subtitle");
+        let date = out.find("class=\"date\"").expect("a date");
+        assert!(title < subtitle && subtitle < date, "{out}");
+    }
+
+    #[test]
+    fn a_repeated_title_keyword_is_joined_with_a_space() {
+        let out = render_body("#+TITLE: One\n#+TITLE: Two\n");
+        assert!(out.contains("<h1 class=\"title\">One Two</h1>"), "{out}");
+    }
+
+    #[test]
+    fn a_document_without_title_keywords_has_no_title_block() {
+        for source in [
+            "* Heading\n\nText.\n",
+            "#+OPTIONS: toc:nil\n\nText.\n",
+            "#+TITLE:\n#+AUTHOR:   \n\nText.\n",
+        ] {
+            let out = render_body(source);
+            assert!(!out.contains("title-block"), "{out}");
+        }
+    }
+
+    #[test]
+    fn a_title_keyword_below_a_headline_is_not_the_document_title() {
+        let out = render_body("* Heading\n#+TITLE: Not this\n");
+        assert!(!out.contains("title-block"), "{out}");
     }
 
     #[test]

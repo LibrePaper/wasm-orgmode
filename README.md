@@ -12,6 +12,8 @@ This is early work: see "What does not work yet" before relying on it.
 Headlines, paragraphs, emphasis, links, lists, tables, quote, example and
 source blocks, and images. On top of that:
 
+- `#+TITLE:`, `#+SUBTITLE:`, `#+AUTHOR:` and `#+DATE:`, as a
+  `<header class="title-block">` that opens the page.
 - TODO keywords and priorities on headlines, as `<span class="todo">` and
   `<span class="priority">`.
 - `SCHEDULED`, `DEADLINE` and `CLOSED` planning lines, as `<p class="planning">`.
