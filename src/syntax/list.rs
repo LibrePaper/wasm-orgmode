@@ -175,7 +175,11 @@ fn list_item_checkbox(input: Input) -> IResult<Input, (GreenElement, Input), ()>
         tuple((
             l_bracket_token,
             verify(take(1usize), |input: &Input| {
-                input.s == " " || input.s == "X" || input.s == "-"
+                input.s == " "
+                    || input.s == "X"
+                    || input.s == "x"
+                    || input.s == "-"
+                    || input.s == "/"
             }),
             r_bracket_token,
         )),

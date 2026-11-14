@@ -97,7 +97,11 @@ impl ListItem {
     /// assert_eq!(item.checkbox().unwrap(), "X");
     /// let item = Org::parse("3) [ ] item 3").first_node::<ListItem>().unwrap();
     /// assert_eq!(item.checkbox().unwrap(), " ");
+    /// let item = Org::parse("- [/] item 4").first_node::<ListItem>().unwrap();
+    /// assert_eq!(item.checkbox().unwrap(), "/");
     /// ```
+    ///
+    /// The box is one of `" "`, `"X"`, `"x"`, `"-"` or `"/"`.
     pub fn checkbox(&self) -> Option<Token> {
         self.syntax
             .children()

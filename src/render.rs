@@ -928,6 +928,55 @@ mod tests {
     fn a_body_has_no_main_wrapper() {
         assert!(!render_body("Hello.\n").contains("<main>"));
     }
+
+    #[test]
+    fn list_checkboxes_render_as_task_items() {
+        let out = render_body("- [ ] a\n- [/] b\n- [-] c\n- [X] d\n- [x] e\n- plain\n");
+        assert!(
+            out.contains("<li class=\"task task-todo\"><input type=\"checkbox\" disabled=\"\" />"),
+            "{out}"
+        );
+        assert!(
+            out.contains("<li class=\"task task-doing\"><input type=\"checkbox\" disabled=\"\" />"),
+            "{out}"
+        );
+        assert_eq!(
+            out.matches("<li class=\"task task-doing\"><input type=\"checkbox\" disabled=\"\" />")
+                .count(),
+            2,
+            "{out}"
+        );
+        assert_eq!(out.matches("task-done").count(), 2, "{out}");
+        assert!(
+            out.contains("<li class=\"task task-done\"><input type=\"checkbox\" checked=\"\" disabled=\"\" />"),
+            "{out}"
+        );
+        assert!(out.contains("<li><p>plain"), "{out}");
+    }
+
+    #[test]
+    fn ordered_list_checkboxes_are_tasks_too() {
+        let out = render_body("1. [ ] ordered\n2. plain\n");
+        assert!(out.contains("<ol>"), "{out}");
+        assert!(out.contains("task-todo"), "{out}");
+    }
+
+    #[test]
+    fn statistics_cookies_render_as_code() {
+        let out = render_body("- [ ] parent [1/2]\n");
+        assert!(out.contains("<code>[1/2]</code>"), "{out}");
+        assert!(out.contains("task-todo"), "{out}");
+
+        let out = render_body("- shopping [/]\n");
+        assert!(out.contains("<code>[/]</code>"), "{out}");
+        assert!(!out.contains("class=\"task"), "{out}");
+    }
+
+    #[test]
+    fn an_unknown_checkbox_state_is_plain_text() {
+        let out = render_body("- [?] x\n");
+        assert!(!out.contains("class=\"task"), "{out}");
+    }
 }
 
 #[cfg(test)]

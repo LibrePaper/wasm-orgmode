@@ -18,6 +18,8 @@ source blocks, and images. On top of that:
   `<span class="priority">`.
 - `SCHEDULED`, `DEADLINE` and `CLOSED` planning lines, as `<p class="planning">`.
 - `CLOCK:` entries, as `<p class="clock">`.
+- List checkboxes `[ ]`, `[X]`, `[-]` and `[/]`, as `<li class="task task-todo|task-doing|task-done">`
+  with a disabled checkbox input, and statistics cookies as `<code>[1/2]</code>`.
 - Footnotes, numbered in order of reference, with their text collected at the
   end of the document.
 - Table captions from `#+CAPTION:`, with math and markup rendered.

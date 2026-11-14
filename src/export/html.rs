@@ -281,6 +281,17 @@ impl Traverser for HtmlExport {
                         self.element(elem, ctx);
                     }
                     self.output += "</dt><dd>";
+                } else if let Some(checkbox) = list_item.checkbox() {
+                    let state: &str = checkbox.as_ref();
+                    let (class, checked) = match state {
+                        "X" | "x" => ("done", r#" checked="""#),
+                        "-" | "/" => ("doing", ""),
+                        _ => ("todo", ""),
+                    };
+                    let _ = write!(
+                        &mut self.output,
+                        r#"<li class="task task-{class}"><input type="checkbox"{checked} disabled="" />"#
+                    );
                 } else {
                     self.output += "<li>";
                 }
@@ -389,6 +400,14 @@ impl Traverser for HtmlExport {
 
             Event::Citation(citation) => {
                 self.output += &crate::render::citation_html(&citation);
+            }
+
+            Event::Cookie(cookie) => {
+                let _ = write!(
+                    &mut self.output,
+                    "<code>{}</code>",
+                    HtmlEscape(cookie.raw())
+                );
             }
 
             Event::Snippet(snippet) => {

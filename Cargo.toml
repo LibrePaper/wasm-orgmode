@@ -1,7 +1,7 @@
 # The Org-mode renderer, as a WebAssembly module.
 [package]
 name = "wasm-orgmode"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 license = "MIT"
 # Never goes to crates.io: the renderers are consumed by git tag.
