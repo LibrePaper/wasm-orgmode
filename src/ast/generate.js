@@ -344,12 +344,12 @@ impl ${node.struct} {
     content += `    pub fn pre_blank(&self) -> usize { super::blank_lines(&self.syntax) }\n`;
   }
   if (node.affiliated_keywords) {
-    content += `    pub fn caption(&self) -> Option<AffiliatedKeyword> { affiliated_keyword(&self.syntax, |k| k == "CAPTION") }\n`;
-    content += `    pub fn header(&self) -> Option<AffiliatedKeyword> { affiliated_keyword(&self.syntax, |k| k == "HEADER") }\n`;
-    content += `    pub fn name(&self) -> Option<AffiliatedKeyword> { affiliated_keyword(&self.syntax, |k| k == "NAME") }\n`;
-    content += `    pub fn plot(&self) -> Option<AffiliatedKeyword> { affiliated_keyword(&self.syntax, |k| k == "PLOT") }\n`;
-    content += `    pub fn results(&self) -> Option<AffiliatedKeyword> { affiliated_keyword(&self.syntax, |k| k == "RESULTS") }\n`;
-    content += `    pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> { affiliated_keyword(&self.syntax, |k| k.starts_with("ATTR_") && &k[5..] == backend) }\n`;
+    content += `    pub fn caption(&self) -> Option<AffiliatedKeyword> { affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION")) }\n`;
+    content += `    pub fn header(&self) -> Option<AffiliatedKeyword> { affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER")) }\n`;
+    content += `    pub fn name(&self) -> Option<AffiliatedKeyword> { affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME")) }\n`;
+    content += `    pub fn plot(&self) -> Option<AffiliatedKeyword> { affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT")) }\n`;
+    content += `    pub fn results(&self) -> Option<AffiliatedKeyword> { affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS")) }\n`;
+    content += `    pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> { affiliated_keyword(&self.syntax, |k| k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_")) && k[5..].eq_ignore_ascii_case(backend)) }\n`;
   }
   content += `}\n`;
 }

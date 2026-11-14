@@ -366,6 +366,9 @@ fn figure_of(paragraph: &Paragraph) -> Option<Figure> {
                     token.kind(),
                     SyntaxKind::WHITESPACE | SyntaxKind::NEW_LINE | SyntaxKind::BLANK_LINE
                 ) => {}
+            // The line break after the link is text of the paragraph.
+            SyntaxElement::Token(token)
+                if token.kind() == SyntaxKind::TEXT && token.text().trim().is_empty() => {}
             SyntaxElement::Node(node) if node.kind() == SyntaxKind::AFFILIATED_KEYWORD => {}
             SyntaxElement::Node(node) if node.kind() == SyntaxKind::LINK => links.push(node),
             _ => return None,
@@ -1260,7 +1263,7 @@ mod tests {
     #[test]
     fn an_image_in_running_text_or_with_no_keywords_renders_as_before() {
         let plain = render_body("[[file:plot.png]]\n");
-        assert!(plain.starts_with("<p><img src=\"plot.png\">"), "{plain}");
+        assert!(plain.contains("<p><img src=\"plot.png\">\n</p>"), "{plain}");
         assert!(!plain.contains("<figure"), "{plain}");
         assert!(!plain.contains("style="), "{plain}");
 

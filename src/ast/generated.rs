@@ -143,23 +143,24 @@ impl Paragraph {
         super::blank_lines(&self.syntax)
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -359,23 +360,24 @@ impl OrgTable {
         super::blank_lines(&self.syntax)
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -487,23 +489,24 @@ impl List {
         support::children(&self.syntax)
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -612,23 +615,24 @@ impl DynBlock {
         self.syntax.to_string()
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -857,23 +861,24 @@ impl FnDef {
         super::blank_lines(&self.syntax)
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -915,23 +920,24 @@ impl FnContent {
         super::blank_lines(&self.syntax)
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -976,23 +982,24 @@ impl Comment {
         super::blank_lines(&self.syntax)
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -1075,23 +1082,24 @@ impl FixedWidth {
         super::blank_lines(&self.syntax)
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -1130,23 +1138,24 @@ impl SpecialBlock {
         self.syntax.to_string()
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -1185,23 +1194,24 @@ impl QuoteBlock {
         self.syntax.to_string()
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -1240,23 +1250,24 @@ impl CenterBlock {
         self.syntax.to_string()
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -1295,23 +1306,24 @@ impl VerseBlock {
         self.syntax.to_string()
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -1350,23 +1362,24 @@ impl CommentBlock {
         self.syntax.to_string()
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -1405,23 +1418,24 @@ impl ExampleBlock {
         self.syntax.to_string()
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -1460,23 +1474,24 @@ impl ExportBlock {
         self.syntax.to_string()
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }
@@ -1515,23 +1530,24 @@ impl SourceBlock {
         self.syntax.to_string()
     }
     pub fn caption(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "CAPTION")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("CAPTION"))
     }
     pub fn header(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "HEADER")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("HEADER"))
     }
     pub fn name(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "NAME")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("NAME"))
     }
     pub fn plot(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "PLOT")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("PLOT"))
     }
     pub fn results(&self) -> Option<AffiliatedKeyword> {
-        affiliated_keyword(&self.syntax, |k| k == "RESULTS")
+        affiliated_keyword(&self.syntax, |k| k.eq_ignore_ascii_case("RESULTS"))
     }
     pub fn attr(&self, backend: &str) -> Option<AffiliatedKeyword> {
         affiliated_keyword(&self.syntax, |k| {
-            k.starts_with("ATTR_") && &k[5..] == backend
+            k.get(..5).is_some_and(|p| p.eq_ignore_ascii_case("ATTR_"))
+                && k[5..].eq_ignore_ascii_case(backend)
         })
     }
 }

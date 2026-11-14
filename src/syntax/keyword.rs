@@ -62,7 +62,17 @@ pub fn affiliated_keyword_nodes(input: Input) -> IResult<Input, Vec<GreenElement
             return Ok((input, vec![]));
         }
 
-        if input_.c.affiliated_keywords.iter().all(|w| w != key) && !key.starts_with("ATTR_") {
+        // Org matches keywords without regard to case: `#+caption:` is `#+CAPTION:`.
+        let is_attr = key
+            .get(..5)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("ATTR_"));
+        if input_
+            .c
+            .affiliated_keywords
+            .iter()
+            .all(|w| !w.eq_ignore_ascii_case(key))
+            && !is_attr
+        {
             break;
         }
 
