@@ -23,6 +23,9 @@ source blocks, and images. On top of that:
 - Footnotes, numbered in order of reference, with their text collected at the
   end of the document.
 - Table captions from `#+CAPTION:`, with math and markup rendered.
+- Figures: an image with `#+CAPTION:` or `#+NAME:` is a `<figure class="figure">` with its caption and id;
+  `#+ATTR_HTML:` gives the width, height and alt text, and the width falls back to `#+ATTR_ORG:` and
+  `#+ATTR_LATEX:` (`0.5\textwidth` is 50%). Affiliated keywords are matched without regard to case.
 - Math, kept as TeX and escaped inside a span tagged `data-math-style="inline"`
   or `"display"`. Typesetting is the host's.
 
